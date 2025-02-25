@@ -1,0 +1,52 @@
+version: 2.1
+
+orbs:
+  win: circleci/windows@5.1.0
+
+workflows:
+  setup-build-test:
+    jobs:
+      - setup
+      - build:
+          requires:
+            - setup
+      - compile:
+          requires:
+            - build
+
+jobs:
+  setup:
+    executor: win/default
+    steps:
+      - checkout
+      - run:
+          name: Install Dependencies
+          command: |
+            choco install git -y
+            choco install premake5 --pre -y
+            choco install gh -y
+  build:
+    executor: win/default
+    steps:
+      - checkout
+      - run:
+          name: Build VS Project Files
+          command: |
+            cd config/Windows
+            & ".\generate_projects.bat"
+      - persist_to_workspace:
+          root: /
+          paths:
+            - ./
+  compile:
+    executor: win/default
+    steps:
+      - attach_workspace:
+          at: /
+      - run:
+          name: Compile VS Project
+          command: |
+            dir
+            msbuild "AurionEngine.sln" /p:Configuration=Dist
+
+# TODO: Persist compile job and write test job
