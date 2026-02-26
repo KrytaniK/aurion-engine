@@ -7,4 +7,4 @@ add_subdirectory(AurionEngine)
 set(CPACK_PACKAGE_NAME "AurionEngine")
 set(CPACK_GENERATOR "ZIP")
 
-include(CPACK)
+include(CPack)

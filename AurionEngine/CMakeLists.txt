@@ -19,12 +19,18 @@ target_compile_features(aurion-engine PUBLIC cxx_std_23)
 target_sources(aurion-engine PUBLIC FILE_SET CXX_MODULES FILES ${MOD})
 
 # ----- Project Dependencies
-list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vendor/AurionCore-1.1.0-win64")
-find_package(glfw3 REQUIRED)
-find_package(aurion-core REQUIRED)
+include(FetchContent)
+
+FetchContent_Declare(
+        aurion-core
+        GIT_REPOSITORY https://github.com/KrytaniK/aurion-core.git
+        GIT_TAG main # Always fetch latest
+)
+
+FetchContent_MakeAvailable(aurion-core)
 
 target_link_libraries(aurion-engine PRIVATE glfw)
-target_link_libraries(aurion-engine PRIVATE Aurion::aurion-core)
+target_link_libraries(aurion-engine PRIVATE aurion-core)
 
 # Include directories based on source/consumer
 target_include_directories(aurion-engine

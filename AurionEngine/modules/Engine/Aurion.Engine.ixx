@@ -1,6 +1,7 @@
 export module Aurion.Engine;
 
 import Aurion.Application;
+import Aurion.Events;
 
 export namespace Aurion {
 
