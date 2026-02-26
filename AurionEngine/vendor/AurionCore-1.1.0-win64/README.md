@@ -12,21 +12,19 @@ The one exception is the **GLFW windowing backend** (`Aurion.GLFW`), which ships
 
 ```
 AurionCore-1.1.0-win64/
-  bin/
-    aurion-core.dll          # Runtime DLL
   include/
-    AurionExport.h           # DLL export/import macros
-    AurionLog.h              # Logging macros
     GLFW/                    # GLFW headers
+    Aurion/                  # Aurion headers and modules
+      AurionExport.h         # DLL export/import macros
+      AurionLog.h            # Logging macros
+      modules/               # C++20 module interface units (.ixx)
   lib/
+    aurion-core.dll          # Runtime DLL
     aurion-core.lib          # Import library
     glfw3.lib                # GLFW static library
     cmake/
       aurion-core/           # CMake package config (aurion-core)
       glfw3/                 # CMake package config (glfw3)
-  share/
-    aurion-core/
-      modules/               # C++20 module interface units (.ixx)
 ```
 
 ## Modules
@@ -68,7 +66,7 @@ find_package(aurion-core REQUIRED)
 
 add_executable(MyApp main.cpp)
 
-target_link_libraries(MyApp PRIVATE Aurion::aurion-core)
+target_link_libraries(MyApp PRIVATE AurionCore::aurion-core)
 
 # Copy runtime DLLs to the output directory
 add_custom_command(TARGET MyApp POST_BUILD
@@ -119,7 +117,7 @@ project "MyApp"
         "src/**.cpp",
         "src/**.ixx",
         -- Include Aurion module interfaces for BMI compilation
-        AURION_DIR .. "/share/aurion-core/modules/**.ixx"
+        AURION_DIR .. "/include/Aurion/modules/**.ixx"
     }
 
     includedirs {
@@ -139,7 +137,7 @@ project "MyApp"
 
     -- Copy runtime DLL to output directory
     postbuildcommands {
-        '{COPYFILE} "' .. AURION_DIR .. '/bin/aurion-core.dll" "%{cfg.targetdir}"'
+        '{COPYFILE} "' .. AURION_DIR .. '/lib/aurion-core.dll" "%{cfg.targetdir}"'
     }
 ```
 
