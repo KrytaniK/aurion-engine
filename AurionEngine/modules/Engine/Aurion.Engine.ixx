@@ -4,22 +4,6 @@ import Aurion.Application;
 import Aurion.Events;
 
 export namespace Aurion {
-
-    /* Core Systems
-        - Virtual File System
-        - Asset Management (Caching/Import/Export/etc.)
-        - Serialization/Deserialization Mechanisms
-        - Rendering (with UI/World separation)
-        - Scene Management
-        - Physics
-        - Audio
-        - Input
-        - Math Library (likely imported)
-        - Better Event/Messaging System
-        - Better Memory Management Utilities
-        - Profiling Tools
-    */
-
     class Engine : virtual public Application
     {
     public:
