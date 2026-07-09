@@ -22,10 +22,7 @@ export namespace Aurion
         ~FrameTimer();
 
         const FrameTime& BeginFrame();
-        void EndFrame();
-
         bool BeginFixedStep();
-        void EndFixedStep();
 
     private:
         Clock m_clock;
@@ -33,7 +30,7 @@ export namespace Aurion
         FrameTime m_frame;
         f64 m_accumulator;
         u32 m_steps_this_frame;
-        Clock::Timepoint m_frame_end;
-        Clock::Timepoint m_fixed_frame_end;
+        Clock::Timepoint m_frame_start;
+        Clock::Timepoint m_fixed_frame_start;
     };
 }

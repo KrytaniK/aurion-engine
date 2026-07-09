@@ -1,15 +1,20 @@
+module;
+
 #include <chrono>
 #include <AurionLog.h>
 
-import Aurion.Time;
+module Aurion.Time;
+
 import Aurion.Types;
 
 namespace Aurion
 {
     FrameTimer::FrameTimer(const FrameTimerConfig& config)
-        : m_config(config), m_frame_end(Clock::SteadyClock::now())
+        : m_config(config), m_frame_start(Clock::SteadyClock::now()), m_fixed_frame_start(Clock::SteadyClock::now()),
+            m_steps_this_frame(0)
     {
-        AURION_WARN("Frame Count: %u", m_frame.frameCount);
+        m_frame.totalTime = 0.0f;
+        m_frame.frameCount = 1;
     }
 
     FrameTimer::~FrameTimer()
@@ -19,11 +24,14 @@ namespace Aurion
 
     const FrameTime& FrameTimer::BeginFrame()
     {
-        // Track the time since the last frame
-        m_frame.deltaTime = Clock::Duration<f64, Clock::MilliSeconds>(Clock::SteadyClock::now() - m_frame_end).count();
+        const Clock::Timepoint now = Clock::SteadyClock::now();
+
+        // Track the time since the last frame; start new frame
+        m_frame.deltaTime = Clock::Duration<f64, Clock::Seconds>(now - m_frame_start).count();
+        m_frame_start = now;
 
         // Clamp the delta time to avoid spiral of death
-        m_frame.deltaTime = m_frame.deltaTime > m_config.fixedDeltaTime
+        m_frame.deltaTime = m_frame.deltaTime > m_config.maxDeltaTime
             ? m_config.maxDeltaTime
             : m_frame.deltaTime;
 
@@ -31,15 +39,10 @@ namespace Aurion
         m_frame.frameCount++;
         m_accumulator += m_frame.deltaTime;
 
-        // Track the time since engine start
-        m_frame.totalTime = Clock::TimeSinceStart();
+        // Update the time since timer start
+        m_frame.totalTime += m_frame.deltaTime;
 
         return m_frame;
-    }
-
-    void FrameTimer::EndFrame()
-    {
-        m_frame_end = Clock::SteadyClock::now();
     }
 
     bool FrameTimer::BeginFixedStep()
@@ -49,25 +52,25 @@ namespace Aurion
         if (m_accumulator >= m_config.fixedDeltaTime &&
             m_steps_this_frame < m_config.maxFixedSteps)
         {
-            // Track the time since the last fixed frame
-            m_frame.fixedDeltaTime =
-                Clock::Duration<f64, Clock::MilliSeconds>(Clock::SteadyClock::now() - m_fixed_frame_end).count();
+            const Clock::Timepoint now = Clock::SteadyClock::now();
+
+            // Track the time since the last fixed frame; start new fixed frame
+            m_frame.fixedDeltaTime = Clock::Duration<f64, Clock::Seconds>(now - m_fixed_frame_start).count();
+            m_fixed_frame_start = now;
 
             m_accumulator -= m_config.fixedDeltaTime;
+
             m_frame.fixedStepCount++;
             m_steps_this_frame++;
             return true;
         }
 
         // The alpha value tells us how far between the last and next fixed update we are.
-        m_frame.alpha = m_accumulator / m_config.fixedDeltaTime;
+        m_frame.alpha = m_frame.fixedDeltaTime > 0.f
+            ? m_accumulator / m_frame.fixedDeltaTime
+            : 0.f;
 
         m_steps_this_frame = 0;
         return false;
-    }
-
-    void FrameTimer::EndFixedStep()
-    {
-        m_fixed_frame_end = Clock::SteadyClock::now();
     }
 }

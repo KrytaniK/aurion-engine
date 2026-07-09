@@ -1,6 +1,9 @@
+module;
+
 #include <chrono>
 
-import Aurion.Time;
+module Aurion.Time;
+
 import Aurion.Types;
 
 namespace Aurion
