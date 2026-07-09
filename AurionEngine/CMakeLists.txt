@@ -7,6 +7,7 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 # Source files & Modules
 file(GLOB_RECURSE MOD CONFIGURE_DEPENDS "modules/*.ixx")
 file(GLOB_RECURSE SRC CONFIGURE_DEPENDS "src/*.cpp")
+file(GLOB_RECURSE TESTSRC CONFIGURE_DEPENDS "tests/*.cpp")
 
 # Project is a static library
 add_library(aurion-engine STATIC ${SRC})
@@ -70,3 +71,11 @@ if (WIN32)
 elseif (UNIX AND NOT APPLE)
     target_compile_definitions(aurion-engine PRIVATE AURION_PLATFORM_LINUX)
 endif()
+
+# Testing
+
+add_executable(aurion-engine-tests ${TESTSRC})
+
+target_link_libraries(aurion-engine-tests PRIVATE glfw)
+target_link_libraries(aurion-engine-tests PRIVATE aurion-engine)
+target_link_libraries(aurion-engine-tests PRIVATE aurion-core)
