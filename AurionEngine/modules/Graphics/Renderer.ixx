@@ -9,6 +9,7 @@ import Aurion.Resources;
 import Aurion.Types;
 
 import :IGraphicsDriver;
+import :RenderGraph;
 
 export namespace Aurion
 {
@@ -21,6 +22,9 @@ export namespace Aurion
         // Registration method for Window/Graphics API driver classes
         template<typename T, typename... Args>
         void RegisterAPI(Args&&... args);
+
+        // Pipeline Generation From RenderGraph Output
+        void BuildPipeline(const RenderPipelineDescription& desc);
 
         // Window-Specific Operations
         WindowHandle OpenWindow(const WindowProperties& properties);
