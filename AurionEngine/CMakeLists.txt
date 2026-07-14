@@ -38,8 +38,17 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(aurion-core)
 
+# Vulkan
+find_package(slang CONFIG HINTS "$ENV{VULKAN_SDK}/lib/cmake")
+
+if (Vulkan_FOUND)
+    include_directories(${Vulkan_INCLUDE_DIRS})
+    link_libraries(${VULKAN_LIBRARY_DIRS})
+    endif()
+
 target_link_libraries(aurion-engine PRIVATE glfw)
 target_link_libraries(aurion-engine PRIVATE aurion-core)
+target_link_libraries(aurion-engine PRIVATE ${Vulkan_LIBRARIES})
 
 # Setting up build targets for find_package() support
 include(GNUInstallDirs)

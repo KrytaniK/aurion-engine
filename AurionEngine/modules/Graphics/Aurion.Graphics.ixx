@@ -7,5 +7,5 @@ export import :RenderPass;
 export import :Renderer;
 
 // Convenience exports
-export import Aurion.Window;
-export import Aurion.GLFW;
+export import Aurion.Window; // Abstract Window Objects
+export import Aurion.GLFW; // Cross-Platform OS Window Handling

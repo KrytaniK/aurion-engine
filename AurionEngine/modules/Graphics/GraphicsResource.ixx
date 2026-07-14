@@ -25,7 +25,8 @@ export namespace Aurion
     struct GPUResourceDescription
     {
         std::string name; // Name of the resource (MUST be unique!)
-        u64 id; // Unique ID, hashed from resource name
+        u64 id; // Unique ID, hashed from resource name "aurion-engine" links to:
+
         GPUResourceConfig* config;
     };
 }

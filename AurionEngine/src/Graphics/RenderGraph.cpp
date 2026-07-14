@@ -4,7 +4,6 @@ module;
 #include <vector>
 #include <span>
 #include <functional>
-#include <algorithm>
 #include <stdexcept>
 
 module Aurion.Graphics;
