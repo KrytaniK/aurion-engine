@@ -17,7 +17,6 @@ namespace Aurion
     Clock::Clock()
         : m_start(SteadyClock::now())
     {
-
     }
 
     void Clock::Reset()
@@ -25,7 +24,7 @@ namespace Aurion
         m_start = SteadyClock::now();
     }
 
-    template<typename Rep, typename Period>
+    template <typename Rep, typename Period>
     Clock::Duration<Rep, Period> Clock::ElapsedTime() const
     {
         return Clock::Duration<Rep, Period>(m_start - SteadyClock::now());

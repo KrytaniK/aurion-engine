@@ -12,7 +12,9 @@ module Aurion.Resources;
 
 namespace Aurion
 {
-    void ResourceManager::OnRegister() {}
+    void ResourceManager::OnRegister()
+    {
+    }
 
     void ResourceManager::OnRestart()
     {
@@ -63,7 +65,7 @@ namespace Aurion
         return static_cast<T*>(it->second.get());
     }
 
-    template<typename T>
+    template <typename T>
     std::string_view ResourceManager::GetResourceName(const u64& resource_id)
     {
         // Check first for any resources of the provided type
@@ -148,7 +150,7 @@ namespace Aurion
         return ResourceHandle<T>(hash, this);
     }
 
-    template<typename T>
+    template <typename T>
     void ResourceManager::Release(const u64& resource_id)
     {
         static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
@@ -160,7 +162,8 @@ namespace Aurion
         // If no resources of this type exist, simply return
         if (refs_by_type == m_reference_map.end())
         {
-            AURION_WARN("[ResourceManager] Failed to release resource with id %d: No resources of type (%s) exist!", resource_id, typeid(T).name());
+            AURION_WARN("[ResourceManager] Failed to release resource with id %d: No resources of type (%s) exist!",
+                        resource_id, typeid(T).name());
             return;
         }
 
@@ -168,7 +171,8 @@ namespace Aurion
 
         if (it == refs_by_type->second.end())
         {
-            AURION_WARN("[ResourceManager] Failed to release resource with id %d: Resource does not exist!", resource_id);
+            AURION_WARN("[ResourceManager] Failed to release resource with id %d: Resource does not exist!",
+                        resource_id);
             return;
         }
 

@@ -19,8 +19,10 @@ namespace Aurion
             throw std::runtime_error("[Renderer] Failed to build graphics pipeline: No Graphics API specified!");
 
         // Generate all resources on the backend
-        for (const auto& resource_desc : desc.resource_descriptions) {}
-            // m_graphics_driver->CreateResource(resource_desc);
+        for (const auto& resource_desc : desc.resource_descriptions)
+        {
+        }
+        // m_graphics_driver->CreateResource(resource_desc);
     }
 
     WindowHandle Renderer::OpenWindow(const WindowProperties& properties)

@@ -11,171 +11,105 @@ module Aurion.Vulkan;
 import Aurion.Services;
 import Aurion.Types;
 
-namespace Aurion
+namespace Aurion::Vulkan
 {
-    vk::Bool32 VulkanDebugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
-        vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
-        void* pUserData)
-    {
-        switch (severity)
-        {
-        case vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose:
-            {
-                AURION_TRACE("[Vulkan Validation] \n\tType: %s\n\tMessage: %s", to_string(type), pCallbackData->pMessage);
-                break;
-            }
-        case vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo:
-            {
-                AURION_INFO("[Vulkan Validation] \n\tType: %s\n\tMessage: %s", to_string(type), pCallbackData->pMessage);
-                break;
-            }
-        case vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning:
-            {
-                AURION_WARN("[Vulkan Validation] \n\tType: %s\n\tMessage: %s", to_string(type), pCallbackData->pMessage);
-
-                break;
-            }
-        case vk::DebugUtilsMessageSeverityFlagBitsEXT::eError:
-            {
-                AURION_ERROR("[Vulkan Validation] \n\tType: %s\n\tMessage: %s", to_string(type), pCallbackData->pMessage);
-                break;
-            }
-        }
-
-        return vk::False;
-    }
-
-    VulkanDriver::VulkanDriver(const VulkanDriverConfig& config)
-        : m_instance(nullptr), m_debug_messenger(nullptr)
+    Driver::Driver(
+        const vk::raii::PhysicalDevice& physical_device,
+        const LogicalDeviceConfig& device_config)
+        : m_physical_device(physical_device), m_logical_device(nullptr)
     {
         // Ensure access to application resources
         m_resource_manager = ServiceLocator::GetService<ResourceManager>();
 
-        // Validate that required extensions exist
-        ValidateExtensions(config.extensions);
+        // Attempt to retrieve the Vulkan API Service
+        Vulkan::API* api = ServiceLocator::GetService<Vulkan::API>();
+        if (!api)
+            throw std::runtime_error("[Vulkan Driver] Vulkan API Service is unavailable");
 
-        // Configure instance creation
-        vk::InstanceCreateInfo create_info = vk::InstanceCreateInfo()
-            .setPApplicationInfo(&config.app_info)
-            .setEnabledExtensionCount(config.extension_count)
-            .setPEnabledExtensionNames(config.extensions);
+        // If available, grab references to the context and instance
+        m_context = &api->GetContext();
+        m_instance = &api->GetInstance();
 
-        // Check validation layer compatibility and optionally enable them (enabled via project build config)
-        ToggleValidationLayers();
+        // Create the logical device for interfacing with the physical device
 
-        // Attempt to create Vulkan Instance
-        try
+        // TODO: Implement queue family aggregation and optimal selection.
+        //      This can be done in 3 phases:
+        //          1. Resolve each queue description to a specific queue family (opting for the one with the least flag bits set)
+        //          2. Accumulate all queue descriptions per family
+        //          3. Generate a single create info struct per family
+        //      In the future, there needs to be a way to tie a specific queue(s) to their descriptions, and a handle for future use.
         {
-            m_instance = vk::raii::Instance(m_context, create_info);
-        }
-        catch (const vk::SystemError& e)
-        {
-            throw std::runtime_error(e.what());
-        }
+            std::vector<vk::QueueFamilyProperties> qfprops = m_physical_device.getQueueFamilyProperties();
+            std::vector<vk::DeviceQueueCreateInfo> create_queues{};
 
-        // Optionally enable debug messaging (enabled via project build config)
-        ToggleDebugMessenger();
-    }
-
-    VulkanDriver::~VulkanDriver()
-    {
-
-    }
-
-    void VulkanDriver::BeginFrame()
-    {
-
-    }
-
-    void VulkanDriver::RecordCommands()
-    {
-
-    }
-
-    void VulkanDriver::EndFrame()
-    {
-
-    }
-
-    void VulkanDriver::CreateRenderTarget(const Window* window)
-    {
-
-    }
-
-    void VulkanDriver::ValidateExtensions(const std::span<const char*>& extensions) const
-    {
-        auto extensionProperties = m_context.enumerateInstanceExtensionProperties();
-        for (const auto& extension : extensions)
-        {
-            if (std::ranges::none_of(
-                    extensionProperties,
-                    [ext = extension](const auto& ext_prop)
-                    {
-                        return strcmp(ext_prop.extensionName, ext) == 0;
-                    }
-                ))
+            for (u32 i = 0; i < qfprops.size(); ++i)
             {
-                throw std::runtime_error("Required Extension \"" + std::string(extension) + "\" not supported");
+                const auto& q = qfprops[i];
+                AURION_WARN("Queue Flags for Queue [%d]: %d", i, q.queueFlags);
+            }
+
+            for (const auto& queue_desc : device_config.queues)
+            {
+                AURION_WARN("Looking For Flags: %d", queue_desc.flags);
+
+                // Attempt to find
+                auto qfp = std::ranges::find_if(
+                    qfprops,
+                    [&](const auto& prop)
+                    {
+                        return (prop.queueFlags & queue_desc.flags) != static_cast<vk::QueueFlags>(0);
+                    });
+
+                // If the element was found
+                if (qfp != qfprops.end())
+                {
+                    // Grab its index
+                    u32 index = std::distance(qfprops.begin(), qfp);
+
+                    // Create the generation structure
+                    vk::DeviceQueueCreateInfo dqcInfo;
+                    dqcInfo.queueFamilyIndex = index;
+                    dqcInfo.queueCount = queue_desc.count;
+                    dqcInfo.pQueuePriorities = queue_desc.priorities.data();
+
+                    // Add to queue creation data
+                    create_queues.push_back(dqcInfo);
+                }
             }
         }
+
+        vk::DeviceCreateInfo dcInfo{};
+        dcInfo.pNext = device_config.features;
+        dcInfo.queueCreateInfoCount = static_cast<u32>(create_queues.size());
+        dcInfo.pQueueCreateInfos = create_queues.data();
+        dcInfo.enabledExtensionCount = static_cast<u32>(device_config.extensions.size());
+        dcInfo.ppEnabledExtensionNames = device_config.extensions.data();
+
+        // m_logical_device = vk::raii::Device(m_physical_device, dcInfo);
     }
 
-    void VulkanDriver::ToggleValidationLayers() const
+    Driver::~Driver()
     {
-        if constexpr (!g_vk_validation_layers_enabled) return;
 
-        std::vector required(g_vk_validation_layers.begin(), g_vk_validation_layers.end());
-
-        auto layerProperties = m_context.enumerateInstanceLayerProperties();
-
-        auto unsupportedLayerIt = std::ranges::find_if(
-            required,
-            [&layerProperties](const auto& layer)
-            {
-                return std::ranges::none_of(
-                    layerProperties,
-                    [layer](const auto& prop)
-                    {
-                        return strcmp(prop.layerName, layer) == 0;
-                    }
-                );
-            }
-        );
-
-        if (unsupportedLayerIt != required.end())
-        {
-            throw std::runtime_error("Required Validation Layer \"" + std::string(*unsupportedLayerIt) + "\" not supported");
-        }
     }
 
-    void VulkanDriver::ToggleDebugMessenger()
+    void Driver::BeginFrame()
     {
-        // TODO (FUTURE): Make this configurable!
 
-        if constexpr (!g_vk_validation_layers_enabled) return;
+    }
 
-        // Set desired severity flags (All enabled by default
-        const vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(
-            vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-                vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
-                vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-                vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
-        );
+    void Driver::RecordCommands()
+    {
 
-        const vk::DebugUtilsMessageTypeFlagsEXT type_flags(
-            vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
-                vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-                vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding
-        );
+    }
 
-        vk::DebugUtilsMessengerCreateInfoEXT create_info;
-        create_info
-            .setMessageSeverity(severity_flags)
-            .setMessageType(type_flags)
-            .setPfnUserCallback(&VulkanDebugCallback);
+    void Driver::EndFrame()
+    {
 
+    }
 
-        m_debug_messenger = m_instance.createDebugUtilsMessengerEXT(create_info);
+    void Driver::CreateRenderTarget(const Window* window)
+    {
+
     }
 }

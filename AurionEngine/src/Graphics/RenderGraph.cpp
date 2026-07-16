@@ -81,8 +81,8 @@ namespace Aurion
         std::vector<bool> visited(m_pass_descriptions.size(), false);
         std::vector<bool> stack(m_pass_descriptions.size(), false);
 
-        std::function<void(u64)> visit = [&](const u64& node) {
-
+        std::function < void(u64) > visit = [&](const u64& node)
+        {
             // If the stack already contains this node, there is a
             // circular dependency
             if (stack[node])
@@ -100,9 +100,9 @@ namespace Aurion
                 visit(dep);
 
             // Once all dependents have been processed:
-            stack[node] = false;  // Remove from the call-stack
-            visited[node] = true;   // Mark this pass as processed
-            execution_order.push_back(node);  // Add index to execution sequence
+            stack[node] = false; // Remove from the call-stack
+            visited[node] = true; // Mark this pass as processed
+            execution_order.push_back(node); // Add index to execution sequence
         };
 
         // Process all unvisited nodes

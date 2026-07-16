@@ -14,7 +14,7 @@ import Aurion.Services;
 
 export namespace Aurion
 {
-    template<typename T>
+    template <typename T>
     class ResourceHandle;
 
     class ResourceManager : public IService
@@ -31,23 +31,23 @@ export namespace Aurion
         ~ResourceManager() override = default;
 
         // Resource Metadata Retrieval
-        template<typename T>
+        template <typename T>
         std::string_view GetResourceName(const u64& resource_id);
 
         // Resource Checking
-        template<typename T>
+        template <typename T>
         bool HasResource(const std::string_view& resource_id);
-        template<typename T>
+        template <typename T>
         bool HasResource(const u64& resource_id);
 
         // Efficiency Methods
 
         // Loads a resource from either the cache (if frequently accessed) or from disk
-        template<typename T>
+        template <typename T>
         ResourceHandle<T> Load(const std::string_view& resource_id);
 
         // Release a resource if there are no remaining references
-        template<typename T>
+        template <typename T>
         void Release(const u64& resource_id);
 
         // Release all resources from memory
@@ -60,13 +60,13 @@ export namespace Aurion
         void OnUnregister() override;
 
         // Resource Retrieval
-        template<typename T>
+        template <typename T>
         T* GetResource(const std::string_view& resource_id);
-        template<typename T>
+        template <typename T>
         T* GetResource(const u64& resource_id);
 
         // Allows instantiations of ResourceHandle to retrieve actual resource instances
-        template<typename U>
+        template <typename U>
         friend class ResourceHandle;
 
     private:
@@ -76,17 +76,21 @@ export namespace Aurion
     };
 
     // Resource Handle
-    template<typename T>
+    template <typename T>
     class ResourceHandle
     {
         static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
 
     public:
         ResourceHandle()
-            : m_resource_id(UINT_MAX), m_resource_manager(nullptr) {};
+            : m_resource_id(UINT_MAX), m_resource_manager(nullptr)
+        {
+        };
 
         ResourceHandle(const u64& id, ResourceManager* resource_manager)
-            : m_resource_id(id), m_resource_manager(resource_manager) {};
+            : m_resource_id(id), m_resource_manager(resource_manager)
+        {
+        };
 
         ~ResourceHandle()
         {

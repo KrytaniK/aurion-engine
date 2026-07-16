@@ -11,7 +11,7 @@ namespace Aurion
 {
     FrameTimer::FrameTimer(const FrameTimerConfig& config)
         : m_config(config), m_frame_start(Clock::SteadyClock::now()), m_fixed_frame_start(Clock::SteadyClock::now()),
-            m_steps_this_frame(0)
+          m_steps_this_frame(0)
     {
         m_frame.totalTime = 0.0f;
         m_frame.frameCount = 1;
@@ -19,7 +19,6 @@ namespace Aurion
 
     FrameTimer::~FrameTimer()
     {
-
     }
 
     const FrameTime& FrameTimer::BeginFrame()
@@ -32,8 +31,8 @@ namespace Aurion
 
         // Clamp the delta time to avoid spiral of death
         m_frame.deltaTime = m_frame.deltaTime > m_config.maxDeltaTime
-            ? m_config.maxDeltaTime
-            : m_frame.deltaTime;
+                                ? m_config.maxDeltaTime
+                                : m_frame.deltaTime;
 
         // Increase frame number and accumulate frame time
         m_frame.frameCount++;
@@ -67,8 +66,8 @@ namespace Aurion
 
         // The alpha value tells us how far between the last and next fixed update we are.
         m_frame.alpha = m_frame.fixedDeltaTime > 0.f
-            ? m_accumulator / m_frame.fixedDeltaTime
-            : 0.f;
+                            ? m_accumulator / m_frame.fixedDeltaTime
+                            : 0.f;
 
         m_steps_this_frame = 0;
         return false;

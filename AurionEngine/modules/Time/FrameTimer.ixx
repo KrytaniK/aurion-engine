@@ -10,9 +10,9 @@ export namespace Aurion
 {
     struct FrameTimerConfig
     {
-        f64 fixedDeltaTime = 1.0 / 60.0;    // Default fixed time-step to 60Hz/16ms
-        f64 maxDeltaTime = 5.0 / 60;        // Clamp deltaTime to avoid spiral of death
-        u32 maxFixedSteps = 8;              // Hard cap on fixed steps per frame
+        f64 fixedDeltaTime = 1.0 / 60.0; // Default fixed time-step to 60Hz/16ms
+        f64 maxDeltaTime = 5.0 / 60; // Clamp deltaTime to avoid spiral of death
+        u32 maxFixedSteps = 8; // Hard cap on fixed steps per frame
     };
 
     class FrameTimer

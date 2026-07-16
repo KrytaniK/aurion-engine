@@ -20,8 +20,8 @@ export namespace Aurion
         ~Renderer();
 
         // Registration method for Window/Graphics API driver classes
-        template<typename T, typename... Args>
-        void RegisterAPI(Args&&... args);
+        template <typename T, typename... Args>
+        void ConfigureDriver(Args&&... args);
 
         // Pipeline Generation From RenderGraph Output
         void BuildPipeline(const RenderPipelineDescription& desc);
@@ -43,11 +43,12 @@ export namespace Aurion
 
     private:
         std::unique_ptr<IWindowDriver> m_window_driver = nullptr; // API-Specific Window Driver (SDL, GLFW, etc.)
-        std::unique_ptr<IGraphicsDriver> m_graphics_driver = nullptr; // API-Specific Graphics Driver (Vulkan, OpenGL, etc.)
+        std::unique_ptr<IGraphicsDriver> m_graphics_driver = nullptr;
+        // API-Specific Graphics Driver (Vulkan, OpenGL, etc.)
     };
 
-    template <typename T, typename ... Args>
-    void Renderer::RegisterAPI(Args&&... args)
+    template <typename T, typename... Args>
+    void Renderer::ConfigureDriver(Args&&... args)
     {
         if constexpr (std::is_base_of_v<IWindowDriver, T>)
             m_window_driver = std::make_unique<T>(std::forward<Args>(args)...);

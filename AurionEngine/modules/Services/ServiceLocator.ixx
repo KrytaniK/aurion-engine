@@ -3,54 +3,55 @@ module;
 #include <AurionLog.h>
 #include <unordered_map>
 #include <memory>
+#include <ranges>
 #include <typeindex>
 
 export module Aurion.Services:ServiceLocator;
 
 import :IService;
 
-export namespace Aurion {
-
+export namespace Aurion
+{
     // A global instance to manage localized application services, as a singleton.
     class ServiceLocator
     {
-    // Public Methods
+        // Public Methods
     public:
         // Delete Copy Constructor and Assignment operators (No Copying)
-        ServiceLocator(const ServiceLocator &) = delete;
-        ServiceLocator &operator=(const ServiceLocator &) = delete;
+        ServiceLocator(const ServiceLocator&) = delete;
+        ServiceLocator& operator=(const ServiceLocator&) = delete;
 
         // Delete Move Constructor and Assignment operators (No Moving)
-        ServiceLocator(const ServiceLocator &&) = delete;
-        ServiceLocator &operator=(const ServiceLocator &&) = delete;
+        ServiceLocator(const ServiceLocator&&) = delete;
+        ServiceLocator& operator=(const ServiceLocator&&) = delete;
 
         // Register an application service in-place
-        template<typename T, typename... Args>
+        template <typename T, typename... Args>
         static bool RegisterService(Args&&... args);
 
         // Register an application service
         // Note: This transfers ownership!
-        template<typename T>
+        template <typename T>
         static bool RegisterService(const T&& service);
 
         // Restart an existing application service
         // Note: This will keep the old service instance!
-        template<typename T>
+        template <typename T>
         static bool RestartService();
 
         // Restart an existing application service with new arguments
         // Note: This destroys the old service instance!
-        template<typename T, typename... Args>
+        template <typename T, typename... Args>
         static bool RestartService(Args&&... args);
 
         // Unregister an existing application service
-        template<typename T>
+        template <typename T>
         static bool UnregisterService();
 
-        template<typename T>
+        template <typename T>
         static T* GetService();
 
-    // Private Methods
+        // Private Methods
     private:
         // Maintain a single access point; Reference for internal use only
         static ServiceLocator& GetInstance()
@@ -63,14 +64,24 @@ export namespace Aurion {
         ServiceLocator() = default;
 
         // Private destructor (Prevent Accidental Deletion)
-        ~ServiceLocator() = default;
+        ~ServiceLocator();
 
-    // Private Members
+        // Private Members
     private:
         std::unordered_map<std::type_index, std::unique_ptr<IService>> m_services;
     };
 
-    template<typename T, typename... Args>
+    ServiceLocator::~ServiceLocator()
+    {
+        // Unregister all services upon destruction.
+        // NOTE: This is a fail-safe, in case deserialization isn't handled by the consuming
+        //          application. This WILL cause crashing if services are interdependent, since
+        //          iteration order may not be guaranteed.
+        for (const auto& service : m_services | std::views::values)
+            service->OnUnregister();
+    }
+
+    template <typename T, typename... Args>
     bool ServiceLocator::RegisterService(Args&&... args)
     {
         static_assert(std::is_base_of_v<IService, T>, "Service Type must derive from IService");
@@ -93,7 +104,7 @@ export namespace Aurion {
         return success;
     }
 
-    template<typename T>
+    template <typename T>
     bool ServiceLocator::RegisterService(const T&& service)
     {
         static_assert(std::is_base_of_v<IService, T>, "Service Type must derive from IService");
@@ -114,7 +125,7 @@ export namespace Aurion {
         return success;
     }
 
-    template<typename T>
+    template <typename T>
     bool ServiceLocator::RestartService()
     {
         static_assert(std::is_base_of_v<IService, T>, "Service Type must derive from IService");
@@ -141,7 +152,7 @@ export namespace Aurion {
         return true;
     }
 
-    template<typename T, typename... Args>
+    template <typename T, typename... Args>
     bool ServiceLocator::RestartService(Args&&... args)
     {
         static_assert(std::is_base_of_v<IService, T>, "Service Type must derive from IService");
@@ -171,7 +182,7 @@ export namespace Aurion {
         return true;
     }
 
-    template<typename T>
+    template <typename T>
     bool ServiceLocator::UnregisterService()
     {
         static_assert(std::is_base_of_v<IService, T>, "Service Type must derive from IService");
@@ -201,7 +212,7 @@ export namespace Aurion {
         return true;
     }
 
-    template<typename T>
+    template <typename T>
     T* ServiceLocator::GetService()
     {
         static_assert(std::is_base_of_v<IService, T>, "Service Type must derive from IService");

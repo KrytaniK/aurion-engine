@@ -18,7 +18,7 @@ target_compile_features(aurion-engine PUBLIC cxx_std_23)
 # Project Source
 target_sources(aurion-engine
         PUBLIC
-            FILE_SET CXX_MODULES FILES ${MOD}
+        FILE_SET CXX_MODULES FILES ${MOD}
 )
 
 target_include_directories(aurion-engine
@@ -44,7 +44,7 @@ find_package(slang CONFIG HINTS "$ENV{VULKAN_SDK}/lib/cmake")
 if (Vulkan_FOUND)
     include_directories(${Vulkan_INCLUDE_DIRS})
     link_libraries(${VULKAN_LIBRARY_DIRS})
-    endif()
+endif ()
 
 target_link_libraries(aurion-engine PRIVATE glfw)
 target_link_libraries(aurion-engine PRIVATE aurion-core)
@@ -55,7 +55,7 @@ include(GNUInstallDirs)
 
 # Track library for export
 install(TARGETS aurion-engine
-    EXPORT aurion-engine-targets
+        EXPORT aurion-engine-targets
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -67,7 +67,7 @@ install(DIRECTORY macros/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Aurion)
 
 # Generate the .cmake config file
 install(EXPORT aurion-engine-targets
-    FILE aurion-engine-config.cmake
+        FILE aurion-engine-config.cmake
         NAMESPACE AurionEngine::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aurion-engine
 )
@@ -79,7 +79,7 @@ if (WIN32)
     target_compile_definitions(aurion-engine PRIVATE AURION_PLATFORM_WINDOWS)
 elseif (UNIX AND NOT APPLE)
     target_compile_definitions(aurion-engine PRIVATE AURION_PLATFORM_LINUX)
-endif()
+endif ()
 
 # Testing
 

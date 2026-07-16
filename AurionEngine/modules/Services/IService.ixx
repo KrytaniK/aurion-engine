@@ -1,12 +1,12 @@
 module;
 
 
-
 export module Aurion.Services:IService;
 
 class ServiceLocator;
 
-export namespace Aurion {
+export namespace Aurion
+{
     class IService
     {
     public:
