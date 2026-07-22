@@ -5,6 +5,7 @@ export import :GraphicsResource;
 export import :RenderGraph;
 export import :RenderPass;
 export import :Renderer;
+export import :RenderTarget;
 
 // Convenience exports
 export import Aurion.Window; // Abstract Window Objects

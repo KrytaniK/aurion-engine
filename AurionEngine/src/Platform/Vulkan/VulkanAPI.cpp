@@ -104,6 +104,10 @@ namespace Aurion::Vulkan
             auto queue_families = device.getQueueFamilyProperties();
             auto available_extensions = device.enumerateDeviceExtensionProperties();
 
+            AURION_WARN("[Vulkan] Device: %s", &dProps.deviceName);
+            for (const auto& ext : available_extensions)
+                AURION_INFO("[Vulkan] Ext: %s", &ext.extensionName);
+
             // Verify basic device requirements
             meets_basic_reqs =
                 // Verify API version compatibility

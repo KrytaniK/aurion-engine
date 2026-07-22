@@ -5,10 +5,18 @@ module;
 
 export module Aurion.Vulkan:Config;
 
+import Aurion.Window;
+
 import Aurion.Types;
 
 export namespace Aurion::Vulkan
 {
+    // Optional GPU suitability function for advanced property and feature requirements.
+    typedef std::function<bool(const vk::raii::PhysicalDevice&)> PhysicalDeviceSuitabilityFn;
+
+    // Function pointer to the function used to create a presentable Vulkan Surface
+    typedef std::function<VkSurfaceKHR(const vk::raii::Instance&, Window*)> SurfaceCreateFn;
+
     // Handles basic Vulkan instance configuration
     struct APIConfig
     {
@@ -18,7 +26,7 @@ export namespace Aurion::Vulkan
         bool validation_layers_enabled = false;
     };
 
-    // Optional GPU suitability function for basic property requirements
+    // Describes the desired property requirements for GPU selection
     struct PhysicalDeviceProperties
     {
         u32 min_api_version; // The minimum supported Vulkan API version
@@ -27,21 +35,28 @@ export namespace Aurion::Vulkan
         const std::vector<const char*>& extensions; // Required device extensions
     };
 
-    // Optional GPU suitability function for advanced property and feature requirements.
-    typedef std::function<bool(const vk::raii::PhysicalDevice&)> PhysicalDeviceSuitabilityFn;
-
-    struct LogicalDeviceQueueDescription
+    // Describes a request for one or more logical device queues
+    struct QueueDescription
     {
         vk::QueueFlags flags{};
         u8 count = 0;
         std::vector<float> priorities{};
     };
 
-    struct LogicalDeviceConfig
+    // Describes the configuration for a Vulkan Logical Device
+    struct InterfaceConfig
     {
         // A list of queue type preferences, paired with the desired queue creation amount and its priority
-        const std::vector<LogicalDeviceQueueDescription> queues{};
+        const std::vector<QueueDescription> queues{};
         const std::vector<const char*>& extensions{}; // Required device extensions (if any)
         void* features = nullptr; // Required device features (if any)
+    };
+
+    // Handles extended Vulkan Driver configurations
+    struct DriverConfig
+    {
+        vk::raii::PhysicalDevice physical_device = nullptr; // The GPU to use for Vulkan operations
+        InterfaceConfig interface{};
+        SurfaceCreateFn on_surface_create = nullptr;
     };
 }

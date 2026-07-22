@@ -6,6 +6,9 @@ module;
 #include <vector>
 #include <unordered_map>
 #include <ranges>
+#include <string>
+#include <limits>
+#include <algorithm>
 
 module Aurion.Vulkan;
 
@@ -14,10 +17,9 @@ import Aurion.Types;
 
 namespace Aurion::Vulkan
 {
-    Driver::Driver(
-        const vk::raii::PhysicalDevice& physical_device,
-        const LogicalDeviceConfig& device_config)
-        : m_physical_device(physical_device), m_logical_device(nullptr), m_present_queue(nullptr)
+    Driver::Driver(const DriverConfig& config)
+        : m_physical_device(config.physical_device),
+            m_logical_device(nullptr), m_CreateSurfaceFn(config.on_surface_create)
     {
         // Ensure access to application resources
         m_resource_manager = ServiceLocator::GetService<ResourceManager>();
@@ -38,10 +40,10 @@ namespace Aurion::Vulkan
         std::vector<vk::QueueFamilyProperties> device_qfp = m_physical_device.getQueueFamilyProperties();
 
         // Track which queue descriptions belong to which queue family
-        std::unordered_map<u32, std::vector<LogicalDeviceQueueDescription>> queue_family_desc;
+        std::unordered_map<u32, std::vector<QueueDescription>> queue_family_desc;
 
         // Aggregate queue descriptions into their most optimal queue family
-        for (const auto& desc : device_config.queues)
+        for (const auto& desc : config.interface.queues)
         {
             // Filter for all queue families that match the queue description flags
             auto matches = device_qfp | std::views::filter(
@@ -83,7 +85,7 @@ namespace Aurion::Vulkan
 
         // Once queue descriptions have been aggregated by queue family, flatten all descriptions into
         //  one queue description per queue family
-        std::unordered_map<u32, LogicalDeviceQueueDescription> qf_infos;
+        std::unordered_map<u32, QueueDescription> qf_infos;
         for (const auto& [index, desc_arr] : queue_family_desc)
         {
             // Assign a new aggregate queue description
@@ -119,11 +121,11 @@ namespace Aurion::Vulkan
 
         // Then, generate the logical device
         vk::DeviceCreateInfo dcInfo{};
-        dcInfo.pNext = device_config.features;
+        dcInfo.pNext = config.interface.features;
         dcInfo.queueCreateInfoCount = static_cast<u32>(create_queues.size());
         dcInfo.pQueueCreateInfos = create_queues.data();
-        dcInfo.enabledExtensionCount = static_cast<u32>(device_config.extensions.size());
-        dcInfo.ppEnabledExtensionNames = device_config.extensions.data();
+        dcInfo.enabledExtensionCount = static_cast<u32>(config.interface.extensions.size());
+        dcInfo.ppEnabledExtensionNames = config.interface.extensions.data();
 
         m_logical_device = vk::raii::Device(m_physical_device, dcInfo);
 
@@ -175,8 +177,136 @@ namespace Aurion::Vulkan
 
     }
 
-    void Driver::CreateRenderTarget(const Window* window)
+    ResourceHandle<Aurion::RenderTarget> Driver::CreateRenderTarget(const std::string_view& id)
     {
+        // Render targets get stored as application resources
+        auto handle = m_resource_manager->Load<Aurion::RenderTarget, RenderTarget>(id);
 
+        // Assign this driver's logical device to the render target for surface/image
+        //  creation
+        static_cast<RenderTarget*>(handle.Get())->AssignToDriver(this);
+
+        return handle;
+    }
+
+    vk::raii::SurfaceKHR Driver::CreateWindowSurface(Window* window) const
+    {
+        if (!m_CreateSurfaceFn)
+        {
+            AURION_WARN("[Vulkan Driver] Failed to create window surface: Surface creation has not been configured!");
+            return vk::raii::SurfaceKHR(nullptr);
+        }
+
+        return vk::raii::SurfaceKHR(*m_instance, m_CreateSurfaceFn(*m_instance, window));
+    }
+
+    void Driver::ValidatePresentSupport(const vk::raii::SurfaceKHR& surface) const
+    {
+        for (const auto& family : m_queue_families | std::views::values)
+        {
+            if (!m_physical_device.getSurfaceSupportKHR(family.index, *surface))
+                continue;
+
+            // If found, return (for now; Might want to grab a reference to the queue in the future)
+            return;
+        }
+
+        // If no queue was found, presentation isn't supported.
+        throw std::runtime_error("[Vulkan Driver] Failed to validate presentation support: Provided surface does not support image presentation.");
+    }
+
+    vk::raii::SwapchainKHR Driver::CreateSwapchain(
+            const vk::raii::SurfaceKHR& surface,
+            const RenderTargetProperties& properties,
+            vk::raii::SwapchainKHR* old_swapchain
+    ) const {
+        auto capabilities = m_physical_device.getSurfaceCapabilitiesKHR(*surface);
+
+        std::vector<vk::SurfaceFormatKHR> available_formats = m_physical_device.getSurfaceFormatsKHR(*surface);
+        std::vector<vk::PresentModeKHR> available_present_modes = m_physical_device.getSurfacePresentModesKHR(*surface);
+
+        assert(!available_formats.empty() && "[Vulkan Driver] No available surface formats");
+
+        // Attempt to find an SRGB format
+        const auto formatIt = std::ranges::find_if(
+            available_formats,
+            [&](const auto& format)
+            {
+                return format.format == properties.format &&
+                    format.colorSpace == properties.color_space;
+            }
+        );
+
+        // Default to first available in all other cases
+        const auto& chosen_format = formatIt != available_formats.end() ? *formatIt : available_formats.at(0);
+
+        // TODO: Make presentation mode configurable!!!
+
+        // Choose a presentation mode (Try to get fastest, most stable mode, defaulting to
+        //      traditional vertical sync when not available)
+        const auto& chosen_present_mode = std::ranges::any_of(
+            available_present_modes,
+            [&](const vk::PresentModeKHR value)
+            {
+                return properties.present_mode == value;
+            }) ? properties.present_mode : vk::PresentModeKHR::eFifo;
+
+        // Figuring out the swapchain extent
+        vk::Extent2D chosen_extent{};
+
+        if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+            chosen_extent = capabilities.currentExtent;
+        else
+        {
+            chosen_extent = vk::Extent2D{
+                std::clamp<uint32_t>(properties.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+                std::clamp<uint32_t>(properties.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
+            };
+        }
+
+        // Figure out how many images to create: always at least 1 more than the minimum, or at most the maximum
+        auto min_img_count = std::max(static_cast<u32>(properties.frames_in_flight), capabilities.minImageCount + 1);
+        if ((capabilities.maxImageCount > 0) && (capabilities.maxImageCount < capabilities.minImageCount))
+            min_img_count = capabilities.maxImageCount;
+
+        vk::SwapchainCreateInfoKHR scInfo;
+        scInfo.surface = *surface;
+        scInfo.minImageCount = min_img_count;
+        scInfo.imageFormat = chosen_format.format;
+        scInfo.imageColorSpace = chosen_format.colorSpace;
+        scInfo.imageExtent = chosen_extent;
+        scInfo.imageArrayLayers = 1;
+        scInfo.imageUsage = properties.usage_flags;
+        scInfo.imageSharingMode = properties.share_mode;
+        scInfo.preTransform = capabilities.currentTransform;
+        scInfo.compositeAlpha = properties.composite_alpha;
+        scInfo.presentMode = properties.vSync_enabled ? vk::PresentModeKHR::eFifo : chosen_present_mode;
+        scInfo.clipped = properties.clipped;
+        scInfo.oldSwapchain = *old_swapchain; // Used in swapchain recreation
+
+        // Create swapchain and retrieve images
+        return vk::raii::SwapchainKHR(m_logical_device, scInfo, nullptr);
+    }
+
+    std::vector<vk::raii::ImageView> Driver::CreateImageViews(
+        const std::span<vk::Image>& images,
+        const RenderTargetProperties& properties
+    ) const {
+        std::vector<vk::raii::ImageView> views{};
+
+        vk::ImageViewCreateInfo vcInfo{};
+        vcInfo.viewType = properties.view_type;
+        vcInfo.format = properties.format;
+        vcInfo.subresourceRange = properties.subresource_range;
+        vcInfo.components = properties.components;
+
+        std::vector<vk::ImageViewCreateInfo> vcInfos{};
+        for (auto& image : images)
+        {
+            vcInfo.image = image;
+            views.emplace_back(m_logical_device, vcInfo);
+        }
+
+        return views;
     }
 }
