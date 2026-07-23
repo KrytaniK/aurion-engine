@@ -13,15 +13,10 @@ namespace Aurion::Vulkan
     {
     }
 
-    void RenderTarget::AssignToDriver(const Driver* driver)
-    {
-        m_driver = driver;
-    }
-
-    void RenderTarget::Configure(const Aurion::RenderTargetProperties* properties)
+    void RenderTarget::Configure(const Aurion::RenderTarget::Config* properties)
     {
         // Convert to Vulkan::RenderTargetProperties and copy
-        m_config = *static_cast<const RenderTargetProperties*>(properties);
+        m_config = *static_cast<const Config*>(properties);
     }
 
     void RenderTarget::Attach(Window* window)
@@ -54,6 +49,31 @@ namespace Aurion::Vulkan
     void RenderTarget::Validate()
     {
         // Validate and recreate swapchain if necessary
+    }
+
+    u32 RenderTarget::GetWidth() const
+    {
+        return m_config.width;
+    }
+
+    u32 RenderTarget::GetHeight() const
+    {
+        return m_config.height;
+    }
+
+    const vk::Image& RenderTarget::GetImage() const
+    {
+        return m_images[m_current_index];
+    }
+
+    const vk::raii::ImageView& RenderTarget::GetView() const
+    {
+        return m_views[m_current_index];
+    }
+
+    void RenderTarget::AssignToDriver(const Driver* driver)
+    {
+        m_driver = driver;
     }
 
     bool RenderTarget::OnLoad()

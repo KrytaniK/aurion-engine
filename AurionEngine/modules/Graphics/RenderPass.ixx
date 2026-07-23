@@ -6,6 +6,8 @@ module;
 export module Aurion.Graphics:RenderPass;
 
 import :GraphicsResource;
+import :RenderTarget;
+import :Shader;
 
 export namespace Aurion
 {
@@ -24,6 +26,7 @@ export namespace Aurion
         std::string name;
         std::vector<std::string> inputs;
         std::vector<std::string> outputs;
+        std::vector<ShaderDescription> shaders;
 
         // Flag used for resolving iternal render pass dependencies
         RenderPassOp op_type = AURION_GRAPHICS_OP_GRAPHICS; // Determines the type of operation this render pass records.

@@ -177,6 +177,38 @@ namespace Aurion::Vulkan
 
     }
 
+    void Driver::ResolveFrameGraph(const FrameGraph& graph)
+    {
+        std::vector<FrameContext> contexts;
+
+        std::vector<GraphicsResourceConfig*> inputs{};
+        std::vector<GraphicsResourceConfig*> outputs{};
+        for (const auto pass : graph.pass_descriptions)
+        {
+            // Get all input resource descriptions
+            for (const auto& name : pass->inputs)
+                for (const auto& desc : graph.resource_descriptions)
+                    if (name == desc->name)
+                        inputs.push_back(desc.get());
+
+            // Get all output resource descriptions
+            for (const auto& name : pass->outputs)
+                for (const auto& desc : graph.resource_descriptions)
+                    if (name == desc->name)
+                        outputs.push_back(desc.get());
+
+            // Create render pass context; Resolving the command buffer reference and resource handles
+            contexts.emplace_back(
+                ResolveRenderPassCommandBuffer(pass->op_type, pass->channel_index, pass->command_buffer_index),
+                ResolveRenderPassResources(inputs),
+                ResolveRenderPassResources(outputs)
+            );
+
+            inputs.clear();
+            outputs.clear();
+        }
+    }
+
     ResourceHandle<Aurion::RenderTarget> Driver::CreateRenderTarget(const std::string_view& id)
     {
         // Render targets get stored as application resources
@@ -217,7 +249,7 @@ namespace Aurion::Vulkan
 
     vk::raii::SwapchainKHR Driver::CreateSwapchain(
             const vk::raii::SurfaceKHR& surface,
-            const RenderTargetProperties& properties,
+            const RenderTarget::Config& properties,
             vk::raii::SwapchainKHR* old_swapchain
     ) const {
         auto capabilities = m_physical_device.getSurfaceCapabilitiesKHR(*surface);
@@ -232,15 +264,13 @@ namespace Aurion::Vulkan
             available_formats,
             [&](const auto& format)
             {
-                return format.format == properties.format &&
+                return format.format == properties.image.format &&
                     format.colorSpace == properties.color_space;
             }
         );
 
         // Default to first available in all other cases
         const auto& chosen_format = formatIt != available_formats.end() ? *formatIt : available_formats.at(0);
-
-        // TODO: Make presentation mode configurable!!!
 
         // Choose a presentation mode (Try to get fastest, most stable mode, defaulting to
         //      traditional vertical sync when not available)
@@ -276,8 +306,8 @@ namespace Aurion::Vulkan
         scInfo.imageColorSpace = chosen_format.colorSpace;
         scInfo.imageExtent = chosen_extent;
         scInfo.imageArrayLayers = 1;
-        scInfo.imageUsage = properties.usage_flags;
-        scInfo.imageSharingMode = properties.share_mode;
+        scInfo.imageUsage = properties.image.usage;
+        scInfo.imageSharingMode = properties.image.sharingMode;
         scInfo.preTransform = capabilities.currentTransform;
         scInfo.compositeAlpha = properties.composite_alpha;
         scInfo.presentMode = properties.vSync_enabled ? vk::PresentModeKHR::eFifo : chosen_present_mode;
@@ -290,16 +320,14 @@ namespace Aurion::Vulkan
 
     std::vector<vk::raii::ImageView> Driver::CreateImageViews(
         const std::span<vk::Image>& images,
-        const RenderTargetProperties& properties
+        const RenderTarget::Config& properties
     ) const {
         std::vector<vk::raii::ImageView> views{};
 
-        vk::ImageViewCreateInfo vcInfo{};
-        vcInfo.viewType = properties.view_type;
-        vcInfo.format = properties.format;
-        vcInfo.subresourceRange = properties.subresource_range;
-        vcInfo.components = properties.components;
+        // Copy image view configuration
+        vk::ImageViewCreateInfo vcInfo = properties.view;
 
+        // And apply for each image
         std::vector<vk::ImageViewCreateInfo> vcInfos{};
         for (auto& image : images)
         {
@@ -308,5 +336,44 @@ namespace Aurion::Vulkan
         }
 
         return views;
+    }
+
+    RenderPass::Resources Driver::ResolveRenderPassResources(const std::vector<GraphicsResourceConfig*>& configs)
+    {
+        RenderPass::Resources resources{};
+
+        for (const auto& config : configs)
+        {
+            switch (config->rType)
+            {
+            case AURION_GPU_RESOURCE_NULL:
+                throw std::runtime_error("[Renderer] Failed to build render pipeline: Unknown resource type for \"" + config->name + "\".");
+            case AURION_GPU_RESOURCE_RENDER_TARGET:
+                {
+                    const auto handle = m_resource_manager->Load<RenderTarget>(config->name);
+                    handle->Configure(static_cast<RenderTarget::Config*>(config)); // Configure render target
+                    handle->Attach(nullptr); // Create internal render target resources
+                    resources.render_targets.push_back(std::move(handle));
+                    break;
+                }
+            case AURION_GPU_RESOURCE_TEXTURE:
+                {
+
+                    break;
+                }
+            case AURION_GPU_RESOURCE_SAMPLER:
+                {
+
+                    break;
+                }
+            case AURION_GPU_RESOURCE_BUFFER:
+                {
+
+                    break;
+                }
+            }
+        }
+
+        return resources;
     }
 }

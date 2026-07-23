@@ -13,6 +13,7 @@ import Aurion.Types;
 import :RenderTarget;
 import :Config;
 import :Queue;
+import :RenderPass;
 
 export namespace Aurion::Vulkan
 {
@@ -26,6 +27,9 @@ export namespace Aurion::Vulkan
         void RecordCommands() override;
         void EndFrame() override;
 
+        // Pipeline Generation From RenderGraph Output
+        void ResolveFrameGraph(const FrameGraph& graph) override;
+
         // Creates a blank render target, tied to the logical device
         ResourceHandle<Aurion::RenderTarget> CreateRenderTarget(const std::string_view& id) override;
 
@@ -36,14 +40,19 @@ export namespace Aurion::Vulkan
 
         [[nodiscard]] vk::raii::SwapchainKHR CreateSwapchain(
             const vk::raii::SurfaceKHR& surface,
-            const RenderTargetProperties& properties,
+            const RenderTarget::Config& properties,
             vk::raii::SwapchainKHR* old_swapchain = nullptr
         ) const;
 
         [[nodiscard]] std::vector<vk::raii::ImageView> CreateImageViews(
             const std::span<vk::Image>& images,
-            const RenderTargetProperties& properties
+            const RenderTarget::Config& properties
         ) const;
+
+    private:
+        // A helper function to create the application resources a render pass depends on
+        [[nodiscard]] RenderPass::Resources ResolveRenderPassResources(const std::vector<GraphicsResourceConfig*>& configs);
+        [[nodiscard]] vk::raii::CommandBuffer& ResolveRenderPassCommandBuffer(const RenderPassOp& op, const u32& channel, const u32& index);
 
     private:
         ResourceManager* m_resource_manager;

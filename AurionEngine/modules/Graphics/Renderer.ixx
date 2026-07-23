@@ -25,7 +25,7 @@ export namespace Aurion
         void ConfigureDriver(Args&&... args);
 
         // Pipeline Generation From RenderGraph Output
-        void BuildPipeline(const RenderPipelineDescription& desc);
+        void ResolveFrameGraph(const FrameGraph& graph);
 
         // Window-Specific Operations
         WindowHandle OpenWindow(const WindowProperties& properties);
@@ -34,7 +34,7 @@ export namespace Aurion
         // Render a single frame
         void DrawFrame() const;
 
-        // Creates a blank render target, bound to the provided pipeline
+        // Creates a blank render target
         ResourceHandle<RenderTarget> CreateRenderTarget(const std::string_view& id);
 
     private:

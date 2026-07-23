@@ -6,3 +6,4 @@ export import :Config;
 export import :Defaults;
 export import :Queue;
 export import :RenderTarget;
+export import :RenderPass;

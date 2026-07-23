@@ -30,12 +30,12 @@ export namespace Aurion
 
         ~ResourceHandle();
 
-        std::string_view GetResourceName() const;
-        u64 GetId() const;
+        [[nodiscard]] std::string_view GetResourceName() const;
+        [[nodiscard]] u64 GetId() const;
 
         T* Get() const;
 
-        bool IsValid() const;
+        [[nodiscard]] bool IsValid() const;
 
         // Convenience Operators
         T* operator->() const { return Get(); }

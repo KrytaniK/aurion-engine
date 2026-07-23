@@ -9,6 +9,7 @@ import Aurion.Window;
 import Aurion.Types;
 
 import :RenderTarget;
+import :RenderGraph;
 
 export namespace Aurion
 {
@@ -20,6 +21,9 @@ export namespace Aurion
         virtual void BeginFrame() = 0;
         virtual void RecordCommands() = 0;
         virtual void EndFrame() = 0;
+
+        // Pipeline Generation From RenderGraph Output
+        virtual void ResolveFrameGraph(const FrameGraph& graph) = 0;
 
         // Creates a blank render target
         virtual ResourceHandle<RenderTarget> CreateRenderTarget(const std::string_view& id) = 0;

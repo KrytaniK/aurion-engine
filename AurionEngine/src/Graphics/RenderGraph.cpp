@@ -14,23 +14,10 @@ namespace Aurion
     {
         // Cleanup any remaining data
         m_pass_descriptions.clear();
-
-        // If a graph was never compiled, clean up dangling pointers
-        for (const auto& [_, __, config] : m_resource_descriptions)
-            delete config;
+        m_resource_descriptions.clear();
     }
 
-    void RenderGraph::AddResource(const GPUResourceDescription& desc)
-    {
-        m_resource_descriptions.push_back(desc);
-    }
-
-    void RenderGraph::AddPass(const RenderPassDescription& pass)
-    {
-        m_pass_descriptions.push_back(pass);
-    }
-
-    RenderPipelineDescription RenderGraph::Compile()
+    FrameGraph RenderGraph::Compile()
     {
         // First, build the dependency graph
 
@@ -46,20 +33,20 @@ namespace Aurion
             const auto& pass = m_pass_descriptions[i];
 
             // Process all inputs for this pass:
-            // If a write to this resource by another pass was found,
+            // If this resources is written to by another pass,
             // assign the writing pass as a dependency of this pass.
-            for (const auto& input : pass.inputs)
+            for (const auto& input : pass->inputs)
                 if (const auto it = writes.find(input); it != writes.end())
                     dep_matrix[i].push_back(it->second);
 
             // For every pass, ensure the writes (outputs) are tracked.
             // Assuming each pass is in-order, later passes will overwrite this,
             // should another render pass write to the same resource
-            for (const auto& output : pass.outputs)
+            for (const auto& output : pass->outputs)
                 writes[output] = i;
         }
 
-        RenderPipelineDescription rpd{
+        FrameGraph graph{
             .execution_order = TopologicalSort(dep_matrix), // Topologically sort passes to determine execution order
             .pass_descriptions = m_pass_descriptions, // Copy render pass descriptions
             .resource_descriptions = m_resource_descriptions, // Copy resource descriptions
@@ -70,7 +57,7 @@ namespace Aurion
         m_pass_descriptions.clear();
         m_resource_descriptions.clear();
 
-        return rpd;
+        return graph;
     }
 
     std::vector<u64> RenderGraph::TopologicalSort(const std::span<std::vector<u64>>& dependency_matrix) const
