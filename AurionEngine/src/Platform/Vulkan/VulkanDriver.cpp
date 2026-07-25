@@ -181,8 +181,8 @@ namespace Aurion::Vulkan
     {
         std::vector<FrameContext> contexts;
 
-        std::vector<GraphicsResourceConfig*> inputs{};
-        std::vector<GraphicsResourceConfig*> outputs{};
+        std::vector<GraphicsResource::Config*> inputs{};
+        std::vector<GraphicsResource::Config*> outputs{};
         for (const auto pass : graph.pass_descriptions)
         {
             // Get all input resource descriptions
@@ -209,14 +209,25 @@ namespace Aurion::Vulkan
         }
     }
 
+    ResourceHandle<Aurion::Buffer> Driver::CreateBuffer(const std::string_view& id)
+    {
+        // Buffers are stored as application resources
+        auto handle = m_resource_manager->Load<Aurion::Buffer, Vulkan::Buffer>(id);
+
+        // Attach this driver to the buffer
+        handle->Attach(this);
+
+        return handle;
+    }
+
     ResourceHandle<Aurion::RenderTarget> Driver::CreateRenderTarget(const std::string_view& id)
     {
         // Render targets get stored as application resources
-        auto handle = m_resource_manager->Load<Aurion::RenderTarget, RenderTarget>(id);
+        auto handle = m_resource_manager->Load<Aurion::RenderTarget, Vulkan::RenderTarget>(id);
 
-        // Assign this driver's logical device to the render target for surface/image
+        // Assign this driver to the render target for surface/image
         //  creation
-        static_cast<RenderTarget*>(handle.Get())->AssignToDriver(this);
+        handle->Attach(this);
 
         return handle;
     }
@@ -338,7 +349,40 @@ namespace Aurion::Vulkan
         return views;
     }
 
-    RenderPass::Resources Driver::ResolveRenderPassResources(const std::vector<GraphicsResourceConfig*>& configs)
+    vk::raii::Buffer Driver::AllocateBuffer(const Vulkan::Buffer::Config& config) const
+    {
+        vk::BufferCreateInfo bcInfo{};
+        bcInfo.size = config.size;
+        bcInfo.usage = config.usage;
+        bcInfo.sharingMode = config.sharing_mode;
+
+        return vk::raii::Buffer(m_logical_device, bcInfo);
+    }
+
+    vk::raii::DeviceMemory Driver::AllocateBufferMemory(
+        const vk::raii::Buffer& buffer,
+        vk::MemoryPropertyFlags prop_flags
+    ) const
+    {
+        vk::MemoryRequirements reqs = buffer.getMemoryRequirements();
+        vk::PhysicalDeviceMemoryProperties props = m_physical_device.getMemoryProperties();
+
+        u32 mem_type_index = UINT32_MAX;
+        for (u32 i = 0; i < props.memoryTypeCount; i++)
+            if ((reqs.memoryTypeBits & (1 << i)) && (props.memoryTypes[i].propertyFlags & prop_flags) == prop_flags)
+                mem_type_index = i;
+
+        if (mem_type_index == UINT32_MAX)
+            throw std::runtime_error("[Vulkan Driver] Failed to map buffer memory: No suitable memory type!");
+
+        vk::MemoryAllocateInfo alloc_info{};
+        alloc_info.allocationSize = reqs.size;
+        alloc_info.memoryTypeIndex = mem_type_index;
+
+        return vk::raii::DeviceMemory(m_logical_device, alloc_info);
+    }
+
+    RenderPass::Resources Driver::ResolveRenderPassResources(const std::vector<GraphicsResource::Config*>& configs)
     {
         RenderPass::Resources resources{};
 
@@ -346,9 +390,14 @@ namespace Aurion::Vulkan
         {
             switch (config->rType)
             {
-            case AURION_GPU_RESOURCE_NULL:
+            case GraphicsResource::None:
                 throw std::runtime_error("[Renderer] Failed to build render pipeline: Unknown resource type for \"" + config->name + "\".");
-            case AURION_GPU_RESOURCE_RENDER_TARGET:
+            case GraphicsResource::Buffer:
+                {
+
+                    break;
+                }
+            case GraphicsResource::RenderTarget:
                 {
                     const auto handle = m_resource_manager->Load<RenderTarget>(config->name);
                     handle->Configure(static_cast<RenderTarget::Config*>(config)); // Configure render target
@@ -356,17 +405,12 @@ namespace Aurion::Vulkan
                     resources.render_targets.push_back(std::move(handle));
                     break;
                 }
-            case AURION_GPU_RESOURCE_TEXTURE:
+            case GraphicsResource::Texture:
                 {
 
                     break;
                 }
-            case AURION_GPU_RESOURCE_SAMPLER:
-                {
-
-                    break;
-                }
-            case AURION_GPU_RESOURCE_BUFFER:
+            case GraphicsResource::Sampler:
                 {
 
                     break;

@@ -47,9 +47,8 @@ export namespace Aurion::Vulkan
         explicit RenderTarget(const std::string_view& id);
         ~RenderTarget() override = default;
 
-        void Configure(const Aurion::RenderTarget::Config* properties) override;
-
-        void Attach(Window* window) override;
+        void Configure(const GraphicsResource::Config* properties) override;
+        void Attach(const IGraphicsDriver* driver) override;
 
         void Validate() override;
 
@@ -58,8 +57,6 @@ export namespace Aurion::Vulkan
 
         [[nodiscard]] const vk::Image& GetImage() const;
         [[nodiscard]] const vk::raii::ImageView& GetView() const;
-
-        void AssignToDriver(const Driver* driver);
 
     protected:
         bool OnLoad() override;
@@ -71,7 +68,6 @@ export namespace Aurion::Vulkan
         u32 m_current_index{};
         std::vector<vk::Image> m_images;
         std::vector<vk::raii::ImageView> m_views;
-        Window* m_window;
         vk::raii::SurfaceKHR m_surface; // Optional VkSurfaceKHR; Used when attaching to a window
         vk::raii::SwapchainKHR m_swapchain; // Optional swapchain; Used when attaching to a window
     };

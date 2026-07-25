@@ -34,6 +34,9 @@ export namespace Aurion
         // Render a single frame
         void DrawFrame() const;
 
+        // Creates a blank buffer
+        ResourceHandle<Buffer> CreateBuffer(const std::string_view& id);
+
         // Creates a blank render target
         ResourceHandle<RenderTarget> CreateRenderTarget(const std::string_view& id);
 

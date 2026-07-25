@@ -24,9 +24,8 @@ export namespace Aurion
         static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
 
     public:
-        ResourceHandle() : m_resource_id(UINT_MAX), m_resource_manager(nullptr) {};
-        ResourceHandle(const u64& id, ResourceManager* resource_manager)
-            : m_resource_id(id), m_resource_manager(resource_manager) {};
+        ResourceHandle() : m_resource(nullptr), m_resource_manager(nullptr) {};
+        ResourceHandle(const u64& id, ResourceManager* resource_manager);
 
         ~ResourceHandle();
 
@@ -43,7 +42,7 @@ export namespace Aurion
         explicit operator bool() const { return IsValid(); }
 
     private:
-        u64 m_resource_id{};
+        Resource* m_resource;
         ResourceManager* m_resource_manager;
     };
 
@@ -111,37 +110,44 @@ export namespace Aurion
     };
 
     template <typename T>
+    ResourceHandle<T>::ResourceHandle(const u64& id, ResourceManager* resource_manager)
+        : m_resource_manager(resource_manager)
+    {
+        if (!m_resource_manager) return;
+        m_resource = m_resource_manager->GetResource<T>(id);
+    }
+
+    template <typename T>
     ResourceHandle<T>::~ResourceHandle()
     {
         if (!m_resource_manager) return;
 
         // Release the held resource, if available
-        m_resource_manager->Release<T>(m_resource_id);
+        m_resource_manager->Release<T>(m_resource->GetId());
     }
 
     template <typename T>
     std::string_view ResourceHandle<T>::GetResourceName() const
     {
-        return m_resource_manager->GetResourceName<T>(m_resource_id);
+        return m_resource->GetName();
     }
 
     template <typename T>
     u64 ResourceHandle<T>::GetId() const
     {
-        return m_resource_id;
+        return m_resource->GetId();
     };
 
     template <typename T>
     T* ResourceHandle<T>::Get() const
     {
-        if (!m_resource_manager) return nullptr;
-        return m_resource_manager->GetResource<T>(m_resource_id);
+        return static_cast<T*>(m_resource);
     }
 
     template <typename T>
     bool ResourceHandle<T>::IsValid() const
     {
-        return m_resource_manager && m_resource_manager->HasResource<T>(m_resource_id);
+        return m_resource != nullptr;
     };
 
     template <typename T>

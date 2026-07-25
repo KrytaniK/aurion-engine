@@ -6,15 +6,20 @@ export module Aurion.Graphics:Shader;
 
 export namespace Aurion
 {
-    enum ShaderStage
+    enum class ShaderStage
     {
-        AURION_GPU_SHADER_STAGE_VERTEX = 0,
-        AURION_GPU_SHADER_STAGE_FRAGMENT,
+        Vertex = 0,
+        TessellationControl,
+        TessellationEval,
+        Geometry,
+        Fragment,
+        Task,
+        Mesh
     };
 
     struct ShaderDescription
     {
-        ShaderStage stage = AURION_GPU_SHADER_STAGE_VERTEX;
+        ShaderStage stage = ShaderStage::Vertex;
         std::string path;
     };
 }

@@ -11,22 +11,32 @@ import Aurion.Types;
 
 export namespace Aurion
 {
-    enum GraphicsResourceType
+    class IGraphicsDriver;
+    class GraphicsResource : public Resource
     {
-        AURION_GPU_RESOURCE_NULL = 0,
-        AURION_GPU_RESOURCE_RENDER_TARGET,
-        AURION_GPU_RESOURCE_TEXTURE,
-        AURION_GPU_RESOURCE_SAMPLER,
-        AURION_GPU_RESOURCE_BUFFER,
-    };
+    public:
+        enum Type { None = 0, Buffer, Texture, Sampler, RenderTarget, Pipeline };
 
-    struct GraphicsResourceConfig
-    {
-        GraphicsResourceConfig() = default;
-        explicit GraphicsResourceConfig(const GraphicsResourceType& type) : rType(type) {};
-        virtual ~GraphicsResourceConfig() = default;
+        struct Config
+        {
+            Config() = default;
+            explicit Config(const Type& type) : rType(type) {};
+            virtual ~Config() = default;
 
-        std::string name{};
-        GraphicsResourceType rType = AURION_GPU_RESOURCE_NULL;
+            std::string name{};
+            Type rType = None;
+        };
+
+    public:
+        explicit GraphicsResource(const std::string_view& id) : Resource(id) {};
+        ~GraphicsResource() override = default;
+
+        virtual void Configure(const Config* properties) = 0;
+
+        virtual void Attach(const IGraphicsDriver* driver) = 0;
+
+    protected:
+        bool OnLoad() override = 0;
+        bool OnUnload() override = 0;
     };
 }

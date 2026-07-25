@@ -12,13 +12,14 @@ import :GraphicsResource;
 
 export namespace Aurion
 {
-    class RenderTarget : public Resource
+    class RenderTarget : public GraphicsResource
     {
     public:
-        struct Config : GraphicsResourceConfig
+        struct Config : GraphicsResource::Config
         {
-            Config() : GraphicsResourceConfig(AURION_GPU_RESOURCE_RENDER_TARGET) {}
+            Config() : GraphicsResource::Config(GraphicsResource::RenderTarget) {}
 
+            Window* window = nullptr;
             u32 width = 0;
             u32 height = 0;
             u32 frames_in_flight = 3;
@@ -26,12 +27,12 @@ export namespace Aurion
         };
 
     public:
-        explicit RenderTarget(const std::string_view& id) : Resource(id) {};
+        explicit RenderTarget(const std::string_view& id) : GraphicsResource(id) {};
         ~RenderTarget() override = default;
 
-        virtual void Configure(const Config* properties) = 0;
+        void Configure(const GraphicsResource::Config* properties) override = 0;
 
-        virtual void Attach(Window* window) = 0;
+        void Attach(const IGraphicsDriver* driver) override = 0;
 
         virtual void Validate() = 0;
 

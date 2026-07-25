@@ -5,5 +5,8 @@ export import :Driver;
 export import :Config;
 export import :Defaults;
 export import :Queue;
-export import :RenderTarget;
 export import :RenderPass;
+
+export import :Buffer;
+export import :RenderTarget;
+export import :Pipeline;

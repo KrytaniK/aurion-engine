@@ -52,6 +52,14 @@ namespace Aurion
         m_graphics_driver->EndFrame();
     }
 
+    ResourceHandle<Buffer> Renderer::CreateBuffer(const std::string_view& id)
+    {
+        if (!m_graphics_driver)
+            throw std::runtime_error("[Renderer] Failed to create render target: No Graphics API specified!");
+
+        return m_graphics_driver->CreateBuffer(id);
+    }
+
     ResourceHandle<RenderTarget> Renderer::CreateRenderTarget(const std::string_view& id)
     {
         if (!m_graphics_driver)

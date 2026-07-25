@@ -22,7 +22,7 @@ export namespace Aurion
         std::vector<std::shared_ptr<RenderPassDescription>> pass_descriptions;
 
         // A collection of GPU resource descriptions. Resolved by backend rendering API
-        std::vector<std::shared_ptr<GraphicsResourceConfig>> resource_descriptions;
+        std::vector<std::shared_ptr<GraphicsResource::Config>> resource_descriptions;
     };
 
     class RenderGraph
@@ -50,21 +50,21 @@ export namespace Aurion
         [[nodiscard]] std::vector<u64> TopologicalSort(const std::span<std::vector<u64>>& dependency_matrix) const;
 
     private:
-        std::vector<std::shared_ptr<GraphicsResourceConfig>> m_resource_descriptions{};
+        std::vector<std::shared_ptr<GraphicsResource::Config>> m_resource_descriptions{};
         std::vector<std::shared_ptr<RenderPassDescription>> m_pass_descriptions{};
     };
 
     template<typename Resource>
     void RenderGraph::AddResource(const typename Resource::Config& desc)
     {
-        static_assert(std::is_base_of_v<GraphicsResourceConfig, typename Resource::Config>, "Resource Config struct must derive from Aurion::GraphicsResourceConfig");
+        static_assert(std::is_base_of_v<GraphicsResource::Config, typename Resource::Config>, "Resource Config struct must derive from Aurion::GraphicsResource::Config");
         m_resource_descriptions.push_back(std::make_shared<typename Resource::Config>(desc));
     }
 
     template <typename Pass>
     void RenderGraph::AddPass(const typename Pass::Config& desc)
     {
-        static_assert(std::is_base_of_v<RenderPassDescription, typename Pass::Config>, "Resource Config struct must derive from Aurion::RenderPassDescription");
+        static_assert(std::is_base_of_v<RenderPass::Config, typename Pass::Config>, "Resource Config struct must derive from Aurion::RenderPass::Config");
         m_pass_descriptions.push_back(std::make_shared<typename Pass::Config>(desc));
     }
 }

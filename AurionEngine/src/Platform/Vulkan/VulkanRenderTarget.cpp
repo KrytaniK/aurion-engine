@@ -9,25 +9,21 @@ import Aurion.Services;
 namespace Aurion::Vulkan
 {
     RenderTarget::RenderTarget(const std::string_view& id)
-        : Aurion::RenderTarget(id), m_driver(nullptr), m_current_index(0), m_surface(nullptr), m_swapchain(nullptr)
+        : Aurion::RenderTarget(id), m_driver(nullptr), m_current_index(0),
+            m_surface(nullptr), m_swapchain(nullptr)
     {
     }
 
-    void RenderTarget::Configure(const Aurion::RenderTarget::Config* properties)
+    void RenderTarget::Configure(const GraphicsResource::Config* properties)
     {
-        // Convert to Vulkan::RenderTargetProperties and copy
+        // Save a local configuration copy for swapchain recreation
         m_config = *static_cast<const Config*>(properties);
-    }
-
-    void RenderTarget::Attach(Window* window)
-    {
-        m_window = window;
 
         // IF: Window was provided:
-        if (window != nullptr)
+        if (m_config.window != nullptr)
         {
             // Create the presentation surface
-            m_surface = m_driver->CreateWindowSurface(window);
+            m_surface = m_driver->CreateWindowSurface(m_config.window);
 
             // Ensure presentation is supported on said surface
             m_driver->ValidatePresentSupport(m_surface);
@@ -42,8 +38,13 @@ namespace Aurion::Vulkan
             m_views = m_driver->CreateImageViews(m_images, m_config);
         }
         // TODO: ELSE:
-            // Create <frames_in_flight> images
-            // Create <frames_in_flight> image views
+        // Create <frames_in_flight> images
+        // Create <frames_in_flight> image views
+    }
+
+    void RenderTarget::Attach(const IGraphicsDriver* driver)
+    {
+        m_driver = static_cast<const Driver*>(driver);
     }
 
     void RenderTarget::Validate()
@@ -69,11 +70,6 @@ namespace Aurion::Vulkan
     const vk::raii::ImageView& RenderTarget::GetView() const
     {
         return m_views[m_current_index];
-    }
-
-    void RenderTarget::AssignToDriver(const Driver* driver)
-    {
-        m_driver = driver;
     }
 
     bool RenderTarget::OnLoad()

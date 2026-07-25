@@ -33,4 +33,18 @@ export namespace Aurion
         const u32 channel_index = 0; // The preferred rendering channel.
         const u32 command_buffer_index = 0; // The index of the preferred command buffer
     };
+
+    class RenderPass
+    {
+    public:
+        // Basic description of a render pass. Includes the minimum required
+        // members for use within the RenderGraph
+        struct Config
+        {
+            std::string name; // The name of this render pass
+            std::vector<std::string> inputs; // The names of all resource dependencies
+            std::vector<std::string> outputs; // The names of the output resources
+            std::vector<ShaderDescription> shaders; // Descriptions of any shaders this pass uses
+        };
+    };
 }

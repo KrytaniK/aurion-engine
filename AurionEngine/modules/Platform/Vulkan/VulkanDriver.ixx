@@ -2,7 +2,6 @@ module;
 
 #include <vulkan/vulkan_raii.hpp>
 #include <unordered_map>
-#include <string>
 
 export module Aurion.Vulkan:Driver;
 
@@ -10,10 +9,12 @@ import Aurion.Graphics;
 import Aurion.Resources;
 import Aurion.Types;
 
-import :RenderTarget;
 import :Config;
 import :Queue;
 import :RenderPass;
+
+import :RenderTarget;
+import :Buffer;
 
 export namespace Aurion::Vulkan
 {
@@ -30,7 +31,10 @@ export namespace Aurion::Vulkan
         // Pipeline Generation From RenderGraph Output
         void ResolveFrameGraph(const FrameGraph& graph) override;
 
-        // Creates a blank render target, tied to the logical device
+        // Creates a blank buffer, tied to this driver.
+        ResourceHandle<Aurion::Buffer> CreateBuffer(const std::string_view& id) override;
+
+        // Creates a blank render target, tied to this driver.
         ResourceHandle<Aurion::RenderTarget> CreateRenderTarget(const std::string_view& id) override;
 
         // Ensures the provided surface can be presented to
@@ -49,9 +53,12 @@ export namespace Aurion::Vulkan
             const RenderTarget::Config& properties
         ) const;
 
+        [[nodiscard]] vk::raii::Buffer AllocateBuffer(const Vulkan::Buffer::Config& config) const;
+        [[nodiscard]] vk::raii::DeviceMemory AllocateBufferMemory(const vk::raii::Buffer& buffer, vk::MemoryPropertyFlags prop_flags) const;
+
     private:
         // A helper function to create the application resources a render pass depends on
-        [[nodiscard]] RenderPass::Resources ResolveRenderPassResources(const std::vector<GraphicsResourceConfig*>& configs);
+        [[nodiscard]] RenderPass::Resources ResolveRenderPassResources(const std::vector<GraphicsResource::Config*>& configs);
         [[nodiscard]] vk::raii::CommandBuffer& ResolveRenderPassCommandBuffer(const RenderPassOp& op, const u32& channel, const u32& index);
 
     private:
