@@ -17,7 +17,10 @@ export namespace Aurion::Vulkan
     public:
         struct Config : public Aurion::Pipeline::Config
         {
-            VkPipelineCreateFlags flags;
+            explicit Config(const Aurion::Pipeline::Type& type) : Aurion::Pipeline::Config(type) {};
+
+            std::vector<std::string> shaders{}; // Shader references by name
+            vk::PipelineLayoutCreateInfo layout_info{};
             vk::AllocationCallbacks alloc_callbacks = nullptr;
             bool use_cache = false; // If enabled, uses a vk::raii::PipelineCache for allocation
         };
@@ -39,7 +42,7 @@ export namespace Aurion::Vulkan
         bool OnUnload() override = 0;
 
     protected:
-        const Driver* m_driver;
+        const Driver* m_driver{};
         vk::raii::Pipeline m_pipeline;
         vk::raii::PipelineLayout m_layout;
     };
@@ -47,9 +50,11 @@ export namespace Aurion::Vulkan
     class GraphicsPipeline : public Pipeline
     {
     public:
-        struct Config : public Pipeline::Config
+        struct Config : public Pipeline::Config, public vk::GraphicsPipelineCreateInfo
         {
-
+            explicit Config()
+                : Pipeline::Config(Aurion::Pipeline::Type::Graphics)
+            {};
         };
 
     public:

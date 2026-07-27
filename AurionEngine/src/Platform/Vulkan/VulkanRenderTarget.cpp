@@ -1,6 +1,7 @@
 module;
 
 #include <vulkan/vulkan_raii.hpp>
+#include <stdexcept>
 
 module Aurion.Vulkan;
 
@@ -17,7 +18,7 @@ namespace Aurion::Vulkan
     void RenderTarget::Configure(const GraphicsResource::Config* properties)
     {
         // Save a local configuration copy for swapchain recreation
-        m_config = *static_cast<const Config*>(properties);
+        m_config = *dynamic_cast<const Config*>(properties);
 
         // IF: Window was provided:
         if (m_config.window != nullptr)
@@ -70,6 +71,11 @@ namespace Aurion::Vulkan
     const vk::raii::ImageView& RenderTarget::GetView() const
     {
         return m_views[m_current_index];
+    }
+
+    vk::Format RenderTarget::GetFormat() const
+    {
+        return m_config.image.format;
     }
 
     bool RenderTarget::OnLoad()

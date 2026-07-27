@@ -58,6 +58,8 @@ export namespace Aurion::Vulkan
         [[nodiscard]] const vk::Image& GetImage() const;
         [[nodiscard]] const vk::raii::ImageView& GetView() const;
 
+        [[nodiscard]] vk::Format GetFormat() const;
+
     protected:
         bool OnLoad() override;
         bool OnUnload() override;

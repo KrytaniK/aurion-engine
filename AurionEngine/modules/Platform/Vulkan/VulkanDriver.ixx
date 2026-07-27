@@ -31,11 +31,23 @@ export namespace Aurion::Vulkan
         // Pipeline Generation From RenderGraph Output
         void ResolveFrameGraph(const FrameGraph& graph) override;
 
+        // Resource Creation
+        // -----------------------------------------------------
+
         // Creates a blank buffer, tied to this driver.
         ResourceHandle<Aurion::Buffer> CreateBuffer(const std::string_view& id) override;
 
         // Creates a blank render target, tied to this driver.
         ResourceHandle<Aurion::RenderTarget> CreateRenderTarget(const std::string_view& id) override;
+
+        // Creates a blank shader, tied to this driver.
+        ResourceHandle<Shader> CreateShader(const std::string_view& id) override;
+
+        // Creates a blank pipeline, tied to this driver.
+        ResourceHandle<Pipeline> CreatePipeline(const std::string_view& id, const Pipeline::Type& type) override;
+
+        // Resource Creation Utility Functions
+        // -----------------------------------------------------
 
         // Ensures the provided surface can be presented to
         void ValidatePresentSupport(const vk::raii::SurfaceKHR& surface) const;
@@ -56,10 +68,12 @@ export namespace Aurion::Vulkan
         [[nodiscard]] vk::raii::Buffer AllocateBuffer(const Vulkan::Buffer::Config& config) const;
         [[nodiscard]] vk::raii::DeviceMemory AllocateBufferMemory(const vk::raii::Buffer& buffer, vk::MemoryPropertyFlags prop_flags) const;
 
+        [[nodiscard]] vk::raii::ShaderModule CreateShaderModule(const std::vector<char>& code) const;
+
     private:
         // A helper function to create the application resources a render pass depends on
         [[nodiscard]] RenderPass::Resources ResolveRenderPassResources(const std::vector<GraphicsResource::Config*>& configs);
-        [[nodiscard]] vk::raii::CommandBuffer& ResolveRenderPassCommandBuffer(const RenderPassOp& op, const u32& channel, const u32& index);
+        //[[nodiscard]] vk::raii::CommandBuffer& ResolveRenderPassCommandBuffer(const RenderPassOp& op, const u32& channel, const u32& index);
 
     private:
         ResourceManager* m_resource_manager;

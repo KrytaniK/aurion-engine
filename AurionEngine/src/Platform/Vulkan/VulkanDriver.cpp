@@ -198,11 +198,11 @@ namespace Aurion::Vulkan
                         outputs.push_back(desc.get());
 
             // Create render pass context; Resolving the command buffer reference and resource handles
-            contexts.emplace_back(
-                ResolveRenderPassCommandBuffer(pass->op_type, pass->channel_index, pass->command_buffer_index),
-                ResolveRenderPassResources(inputs),
-                ResolveRenderPassResources(outputs)
-            );
+            // contexts.emplace_back(
+            //     ResolveRenderPassCommandBuffer(pass->op_type, pass->channel_index, pass->command_buffer_index),
+            //     ResolveRenderPassResources(inputs),
+            //     ResolveRenderPassResources(outputs)
+            // );
 
             inputs.clear();
             outputs.clear();
@@ -214,7 +214,11 @@ namespace Aurion::Vulkan
         // Buffers are stored as application resources
         auto handle = m_resource_manager->Load<Aurion::Buffer, Vulkan::Buffer>(id);
 
-        // Attach this driver to the buffer
+        // If the handle is invalid, simply return it. This should only happen when
+        //  resource creation failed.
+        if (!handle.IsValid()) return handle;
+
+        // Attach this driver
         handle->Attach(this);
 
         return handle;
@@ -225,8 +229,52 @@ namespace Aurion::Vulkan
         // Render targets get stored as application resources
         auto handle = m_resource_manager->Load<Aurion::RenderTarget, Vulkan::RenderTarget>(id);
 
-        // Assign this driver to the render target for surface/image
-        //  creation
+        // If the handle is invalid, simply return it. This should only happen when
+        //  resource creation failed.
+        if (!handle.IsValid()) return handle;
+
+        // Assign this driver
+        handle->Attach(this);
+
+        return handle;
+    }
+
+    ResourceHandle<Aurion::Shader> Driver::CreateShader(const std::string_view& id)
+    {
+        // Shaders get stored as application resources
+        auto handle = m_resource_manager->Load<Aurion::Shader, Vulkan::Shader>(id);
+
+        // If the handle is invalid, simply return it. This should only happen when
+        //  resource creation failed.
+        if (!handle.IsValid()) return handle;
+
+        // Assign this driver
+        handle->Attach(this);
+
+        return handle;
+    }
+
+    ResourceHandle<Aurion::Pipeline> Driver::CreatePipeline(const std::string_view& id, const Pipeline::Type& type)
+    {
+        // Shaders get stored as application resources
+        ResourceHandle<Aurion::Pipeline> handle;
+
+        switch (type)
+        {
+        case Pipeline::Graphics:
+            {
+                handle = m_resource_manager->Load<Aurion::Pipeline, Vulkan::GraphicsPipeline>(id);
+                break;
+            }
+        default:
+            {
+                // By default, return an invalid handle. This should only happen when
+                //  resource creation failed, or hasn't been implemented.
+                return handle;
+            }
+        }
+
+        // Otherwise, Assign this driver
         handle->Attach(this);
 
         return handle;
@@ -382,13 +430,23 @@ namespace Aurion::Vulkan
         return vk::raii::DeviceMemory(m_logical_device, alloc_info);
     }
 
+    vk::raii::ShaderModule Driver::CreateShaderModule(const std::vector<char>& code) const
+    {
+        vk::ShaderModuleCreateInfo smcInfo{};
+        smcInfo.codeSize = code.size() * sizeof(char);
+        smcInfo.pCode = reinterpret_cast<const u32*>(code.data());
+
+        vk::raii::ShaderModule module(m_logical_device, smcInfo);
+        return module;
+    }
+
     RenderPass::Resources Driver::ResolveRenderPassResources(const std::vector<GraphicsResource::Config*>& configs)
     {
         RenderPass::Resources resources{};
 
         for (const auto& config : configs)
         {
-            switch (config->rType)
+            switch (config->GetType())
             {
             case GraphicsResource::None:
                 throw std::runtime_error("[Renderer] Failed to build render pipeline: Unknown resource type for \"" + config->name + "\".");
@@ -415,6 +473,10 @@ namespace Aurion::Vulkan
 
                     break;
                 }
+            case GraphicsResource::Shader:
+                break;
+            case GraphicsResource::Pipeline:
+                break;
             }
         }
 

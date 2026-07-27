@@ -1,6 +1,6 @@
 module;
 
-
+#include <string>
 
 export module Aurion.Graphics:Buffer;
 

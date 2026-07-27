@@ -1,8 +1,7 @@
 module;
 
-#include <string>
-
 #include <vulkan/vulkan_raii.hpp>
+#include <string>
 
 export module Aurion.Graphics:GraphicsResource;
 
@@ -15,7 +14,7 @@ export namespace Aurion
     class GraphicsResource : public Resource
     {
     public:
-        enum Type { None = 0, Buffer, Texture, Sampler, RenderTarget, Pipeline };
+        enum Type { None = 0, Buffer, Texture, Sampler, RenderTarget, Shader, Pipeline };
 
         struct Config
         {
@@ -23,7 +22,11 @@ export namespace Aurion
             explicit Config(const Type& type) : rType(type) {};
             virtual ~Config() = default;
 
+            [[nodiscard]] Type GetType() const { return rType; }
+
             std::string name{};
+
+        private:
             Type rType = None;
         };
 

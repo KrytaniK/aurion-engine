@@ -5,6 +5,7 @@ module;
 export module Aurion.Vulkan:Buffer;
 
 import Aurion.Graphics;
+import Aurion.Types;
 
 export namespace Aurion::Vulkan
 {

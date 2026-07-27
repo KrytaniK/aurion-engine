@@ -27,6 +27,14 @@ export namespace Aurion
         ResourceHandle() : m_resource(nullptr), m_resource_manager(nullptr) {};
         ResourceHandle(const u64& id, ResourceManager* resource_manager);
 
+        // Copy Constructors
+        ResourceHandle(const ResourceHandle<T>& other);
+        ResourceHandle<T>& operator=(const ResourceHandle<T>& other);
+
+        // Move Constructors
+        ResourceHandle(ResourceHandle<T>&& other) noexcept;
+        ResourceHandle<T>& operator=(ResourceHandle<T>&& other) noexcept;
+
         ~ResourceHandle();
 
         [[nodiscard]] std::string_view GetResourceName() const;
@@ -99,7 +107,10 @@ export namespace Aurion
         template <typename T>
         T* GetResource(const u64& resource_id);
 
-        // Allows instantiations of ResourceHandle to retrieve actual resource instances
+        template<typename T>
+        void AddReference(const u64& resource_id);
+
+        // Allows instantiations of ResourceHandle to retrieve actual resource instances and increase ref counts
         template <typename U>
         friend class ResourceHandle;
 
@@ -115,6 +126,78 @@ export namespace Aurion
     {
         if (!m_resource_manager) return;
         m_resource = m_resource_manager->GetResource<T>(id);
+    }
+
+    template <typename T>
+    ResourceHandle<T>::ResourceHandle(const ResourceHandle<T>& other)
+        : m_resource(nullptr), m_resource_manager(nullptr)
+    {
+        // Don't attempt to copy an invalid handle
+        if (other.m_resource == nullptr || other.m_resource_manager == nullptr) return;
+
+        // Copy the new reference values
+        m_resource = other.m_resource;
+        m_resource_manager = other.m_resource_manager;
+
+        // Add a reference on the backend
+        m_resource_manager->AddReference<T>(m_resource->GetId());
+    }
+
+    template <typename T>
+    ResourceHandle<T>& ResourceHandle<T>::operator=(const ResourceHandle<T>& other)
+    {
+        // Don't attempt to copy an invalid handle, or oneself
+        if (other.m_resource_manager == nullptr || this == &other) return *this;
+
+        // If this handle holds a valid resource, release it
+        if (m_resource && m_resource_manager)
+            m_resource_manager->Release<T>(m_resource->GetId());
+
+        // Copy the new reference values
+        m_resource = other.m_resource;
+        m_resource_manager = other.m_resource_manager;
+
+        // Add a reference on the backend
+        m_resource_manager->AddReference<T>(m_resource->GetId());
+
+        return *this;
+    }
+
+    template <typename T>
+    ResourceHandle<T>::ResourceHandle(ResourceHandle<T>&& other) noexcept
+        : m_resource(nullptr), m_resource_manager(nullptr)
+    {
+        // Don't attempt to take over an invalid handle
+        if (other.m_resource == nullptr || other.m_resource_manager == nullptr) return;
+
+        // Copy handle resources
+        this->m_resource = other.m_resource;
+        this->m_resource_manager = other.m_resource_manager;
+
+        // Invalidate the other handle
+        other.m_resource = nullptr;
+        other.m_resource_manager = nullptr;
+    }
+
+    template <typename T>
+    ResourceHandle<T>& ResourceHandle<T>::operator=(ResourceHandle<T>&& other) noexcept
+    {
+        // Don't attempt to take over an invalid handle, or oneself
+        if (other.m_resource_manager == nullptr || this == &other) return *this;
+
+        // If this handle holds a valid resource, release it
+        if (m_resource && m_resource_manager)
+            m_resource_manager->Release<T>(m_resource->GetId());
+
+        // Copy handle resources
+        this->m_resource = other.m_resource;
+        this->m_resource_manager = other.m_resource_manager;
+
+        // Invalidate the other handle
+        other.m_resource = nullptr;
+        other.m_resource_manager = nullptr;
+
+        return *this;
     }
 
     template <typename T>
@@ -185,6 +268,23 @@ export namespace Aurion
             return nullptr;
 
         return static_cast<T*>(it->second.get());
+    }
+
+    template <typename T>
+    void ResourceManager::AddReference(const u64& resource_id)
+    {
+        // Check first for any references to the provided type
+        const auto& type_map = m_reference_map.find(std::type_index(typeid(T)));
+        if (type_map == m_reference_map.end())
+            return;
+
+        // If any exist, filter by ID.
+        auto it = type_map->second.find(resource_id);
+        if (it == type_map->second.end())
+            return;
+
+        // If any refs to the provided resource exist, increase ref count
+        ++it->second.ref_count;
     }
 
     template <typename T>
@@ -338,7 +438,8 @@ export namespace Aurion
             return;
         }
 
-        // If no more references remain, unload the resource and remove it from the cache
+        // Deduct a reference to this resource:
+        //  If no more references remain, unload the resource and remove it from the cache
         if (--it->second.ref_count == 0)
         {
             it->second.resource->Unload();

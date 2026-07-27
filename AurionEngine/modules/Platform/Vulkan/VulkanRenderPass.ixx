@@ -7,6 +7,7 @@ module;
 export module Aurion.Vulkan:RenderPass;
 
 import Aurion.Graphics;
+import Aurion.Resources;
 
 import :RenderTarget;
 
@@ -33,12 +34,12 @@ export namespace Aurion::Vulkan
         struct Resources
         {
             std::vector<ResourceHandle<Buffer>> buffers;
-            std::vector<ResourceHandle<bool>> textures;
-            std::vector<ResourceHandle<bool>> samplers;
+            // std::vector<ResourceHandle<bool>> textures;
+            // std::vector<ResourceHandle<bool>> samplers;
             std::vector<ResourceHandle<RenderTarget>> render_targets;
-            std::vector<ResourceHandle<bool>> graphics_pipelines;
-            std::vector<ResourceHandle<bool>> compute_pipelines;
-            std::vector<ResourceHandle<bool>> raytrace_pipelines;
+            // std::vector<ResourceHandle<bool>> graphics_pipelines;
+            // std::vector<ResourceHandle<bool>> compute_pipelines;
+            // std::vector<ResourceHandle<bool>> raytrace_pipelines;
         };
 
     public:

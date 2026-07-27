@@ -15,7 +15,7 @@ export namespace Aurion
 
         struct Config : GraphicsResource::Config
         {
-            explicit Config() : GraphicsResource::Config(GraphicsResource::Pipeline) {};
+            explicit Config(const Type& type) : GraphicsResource::Config(GraphicsResource::Pipeline), pType(type) {};
 
             Type pType = Graphics;
         };

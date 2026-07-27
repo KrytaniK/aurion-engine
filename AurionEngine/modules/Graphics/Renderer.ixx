@@ -35,10 +35,16 @@ export namespace Aurion
         void DrawFrame() const;
 
         // Creates a blank buffer
-        ResourceHandle<Buffer> CreateBuffer(const std::string_view& id);
+        [[nodiscard]] ResourceHandle<Buffer> CreateBuffer(const std::string_view& id) const;
 
         // Creates a blank render target
-        ResourceHandle<RenderTarget> CreateRenderTarget(const std::string_view& id);
+        [[nodiscard]] ResourceHandle<RenderTarget> CreateRenderTarget(const std::string_view& id) const;
+
+        // Creates a blank shader
+        [[nodiscard]] ResourceHandle<Shader> CreateShader(const std::string_view& id) const;
+
+        // Creates a blank render pipeline
+        [[nodiscard]] ResourceHandle<Pipeline> CreatePipeline(const std::string_view& id, const Pipeline::Type& type) const;
 
     private:
         std::unique_ptr<IWindowDriver> m_window_driver = nullptr; // API-Specific Window Driver (SDL, GLFW, etc.)

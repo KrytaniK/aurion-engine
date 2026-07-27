@@ -9,4 +9,5 @@ export import :RenderPass;
 
 export import :Buffer;
 export import :RenderTarget;
+export import :Shader;
 export import :Pipeline;

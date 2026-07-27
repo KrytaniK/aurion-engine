@@ -19,7 +19,7 @@ export namespace Aurion
         std::vector<u64> execution_order;
 
         // The list of render pass descriptions
-        std::vector<std::shared_ptr<RenderPassDescription>> pass_descriptions;
+        std::vector<std::shared_ptr<RenderPass::Config>> pass_descriptions;
 
         // A collection of GPU resource descriptions. Resolved by backend rendering API
         std::vector<std::shared_ptr<GraphicsResource::Config>> resource_descriptions;
@@ -51,7 +51,7 @@ export namespace Aurion
 
     private:
         std::vector<std::shared_ptr<GraphicsResource::Config>> m_resource_descriptions{};
-        std::vector<std::shared_ptr<RenderPassDescription>> m_pass_descriptions{};
+        std::vector<std::shared_ptr<RenderPass::Config>> m_pass_descriptions{};
     };
 
     template<typename Resource>

@@ -1,25 +1,59 @@
 module;
 
 #include <string>
+#include <vector>
 
 export module Aurion.Graphics:Shader;
 
+import Aurion.Types;
+
+import Aurion.FileSystem;
+
+import :GraphicsResource;
+
 export namespace Aurion
 {
-    enum class ShaderStage
+    class Shader : public GraphicsResource
     {
-        Vertex = 0,
-        TessellationControl,
-        TessellationEval,
-        Geometry,
-        Fragment,
-        Task,
-        Mesh
-    };
+    public:
+        enum Stage
+        {
+            Vertex = 0,
+            TessellationControl,
+            TessellationEval,
+            Geometry,
+            Fragment,
+            Task,
+            Mesh
+        };
 
-    struct ShaderDescription
-    {
-        ShaderStage stage = ShaderStage::Vertex;
-        std::string path;
+        struct EntryPoint
+        {
+            Stage stage = Vertex;
+            std::string name = "Main";
+        };
+
+        struct Config : GraphicsResource::Config
+        {
+            explicit Config() : GraphicsResource::Config(GraphicsResource::Shader) {};
+
+            std::vector<EntryPoint> entry_points{};
+            std::string path{};
+        };
+
+    public:
+        explicit Shader(const std::string_view& id) : GraphicsResource(id) {};
+        ~Shader() override = default;
+
+        void Configure(const GraphicsResource::Config* properties) override = 0;
+        void Attach(const IGraphicsDriver* driver) override = 0;
+
+    protected:
+        bool OnLoad() override = 0;
+        bool OnUnload() override = 0;
+
+    private:
+        // Get file open/access parameters, based on API implementation
+        virtual FSFileOpenParams GetFileAccessParameters() = 0;
     };
 }

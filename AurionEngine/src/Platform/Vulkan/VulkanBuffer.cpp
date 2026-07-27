@@ -1,7 +1,9 @@
 module;
 
-module Aurion.Vulkan;
+#include <string>
 #include <cstring>
+
+module Aurion.Vulkan;
 
 namespace Aurion::Vulkan
 {
@@ -14,7 +16,7 @@ namespace Aurion::Vulkan
     void Buffer::Configure(const GraphicsResource::Config* properties)
     {
         // Save local configuration
-        m_config = *static_cast<const Config*>(properties);
+        m_config = *dynamic_cast<const Config*>(properties);
 
         // Generate the buffer object
         m_buffer = m_driver->AllocateBuffer(m_config);
@@ -42,18 +44,13 @@ namespace Aurion::Vulkan
         return m_config.size;
     }
 
-    u32 Buffer::GetHeight() const
-    {
-
-    }
-
     bool Buffer::OnLoad()
     {
-
+        return true;
     }
 
     bool Buffer::OnUnload()
     {
-
+        return true;
     }
 }
