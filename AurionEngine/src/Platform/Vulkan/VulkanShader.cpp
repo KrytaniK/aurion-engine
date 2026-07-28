@@ -36,11 +36,9 @@ namespace Aurion::Vulkan
         // Save a local copy of the config
         m_config = *dynamic_cast<const Config*>(properties);
 
-        // First, see if a compiled SPIR-V module exists for this shader.
-        //  Vulkan will throw an error if this file is not a SPIR-V module.
-        // TODO: Implement
+        // TODO: Implement shader cache query and optional compilation/recompilation
 
-        // Generate a file handle to have on hand
+        // Generate a file handle to the shader
         m_file_handle = FSFile(m_config.path.c_str());
 
         // Open the file to get its contents
@@ -76,8 +74,14 @@ namespace Aurion::Vulkan
         // Close the file once finished
         m_file_handle.Close();
 
-        // Then, generate the shader module
-        m_module = m_driver->CreateShaderModule(buffer);
+        // Each entry point gets its own shader module
+        for (const auto& entry : m_config.entry_points)
+        {
+            m_modules.emplace(
+                entry.stage,
+                m_driver->CreateShaderModule(m_config.path, buffer, m_config.lang, entry, m_config.defines)
+            );
+        }
     }
 
     void Shader::Attach(const IGraphicsDriver* driver)
@@ -90,9 +94,12 @@ namespace Aurion::Vulkan
         return m_config.entry_points;
     }
 
-    const vk::raii::ShaderModule& Shader::GetModule() const
+    const vk::raii::ShaderModule& Shader::GetModule(const Shader::EntryPoint& entry) const
     {
-        return m_module;
+        if (!m_modules.contains(entry.stage))
+            return vk::raii::ShaderModule{nullptr};
+
+        return m_modules.at(entry.stage);
     }
 
     bool Shader::OnLoad()

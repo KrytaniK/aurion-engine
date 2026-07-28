@@ -2,6 +2,8 @@ module;
 
 #include <AurionLog.h>
 #include <vulkan/vulkan_raii.hpp>
+#include <shaderc/shaderc.hpp>
+
 #include <stdexcept>
 #include <vector>
 #include <unordered_map>
@@ -430,14 +432,123 @@ namespace Aurion::Vulkan
         return vk::raii::DeviceMemory(m_logical_device, alloc_info);
     }
 
-    vk::raii::ShaderModule Driver::CreateShaderModule(const std::vector<char>& code) const
+    vk::raii::ShaderModule Driver::CreateShaderModule(
+        const std::string_view& path,
+        const std::vector<char>& code,
+        const Shader::Language& lang,
+        const Shader::EntryPoint& entry_point,
+        const std::vector<Shader::Macro>& defines
+    ) const
     {
+        // SPIR-V can be used directly
+        if (lang == Shader::Language::SPIRV)
+        {
+            vk::ShaderModuleCreateInfo smcInfo{};
+            smcInfo.codeSize = code.size() * sizeof(char);
+            smcInfo.pCode = reinterpret_cast<const u32*>(code.data());
+
+            vk::raii::ShaderModule module(m_logical_device, smcInfo);
+            return module;
+        }
+
+        // GLSL/HLSL must be compiled
+        shaderc::Compiler compiler;
+        shaderc::CompileOptions options;
+
+        // Language Spec
+        if (lang == Shader::Language::GLSL)
+            options.SetSourceLanguage(shaderc_source_language_glsl);
+        else if (lang == Shader::Language::HLSL)
+            options.SetSourceLanguage(shaderc_source_language_hlsl);
+
+        // Preprocessor Definitions
+        for (const auto& [key, val] : defines)
+            options.AddMacroDefinition(key, val);
+
+        shaderc_shader_kind shader_kind = shaderc_vertex_shader;
+        switch (entry_point.stage)
+        {
+            case Shader::Stage::Vertex: { shader_kind = shaderc_vertex_shader; break; }
+            case Shader::TessellationControl: { shader_kind = shaderc_tess_control_shader; break; }
+            case Shader::TessellationEval: { shader_kind = shaderc_tess_evaluation_shader; break; }
+            case Shader::Geometry: { shader_kind = shaderc_geometry_shader; break; }
+            case Shader::Fragment: { shader_kind = shaderc_fragment_shader; break; }
+            case Shader::Task: { shader_kind = shaderc_task_shader; break; }
+            case Shader::Mesh: { shader_kind = shaderc_mesh_shader; break; }
+        }
+
+        shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(
+            code.data(),
+            code.size(),
+            shader_kind,
+            path.data(),
+            entry_point.name.c_str(),
+            options
+        );
+
+        if (result.GetCompilationStatus() != shaderc_compilation_status_success)
+            throw std::runtime_error("[Vulkan Driver] Failed to compile '" + std::string(path) + "' into SPIR-V: " + result.GetErrorMessage());
+
+        // Convert to uint32_t array
+        std::vector<u32> spv = {result.cbegin(), result.cend()};
+        // TODO: Save this result to Disk in a shader cache directory
+
+        // Create the shader module
         vk::ShaderModuleCreateInfo smcInfo{};
-        smcInfo.codeSize = code.size() * sizeof(char);
-        smcInfo.pCode = reinterpret_cast<const u32*>(code.data());
+        smcInfo.codeSize = spv.size() * sizeof(u32);
+        smcInfo.pCode = spv.data();
 
         vk::raii::ShaderModule module(m_logical_device, smcInfo);
         return module;
+    }
+
+    vk::raii::PipelineLayout Driver::BuildPipelineLayout(const vk::PipelineLayoutCreateInfo& info) const
+    {
+        return vk::raii::PipelineLayout(m_logical_device, info);
+    }
+
+    vk::raii::Pipeline Driver::BuildGraphicsPipeline(const Vulkan::GraphicsPipeline::Config& config) const
+    {
+        std::vector<ResourceHandle<Aurion::Shader>> shader_handles;
+
+        // Retrieve handles to all shaders
+        for (const auto& name : config.shaders)
+            shader_handles.push_back(m_resource_manager->Load<Aurion::Shader>(name));
+
+        // Build create info structures
+        std::vector<vk::PipelineShaderStageCreateInfo> stage_create_infos{};
+        std::vector<const vk::raii::ShaderModule&> modules;
+        for (auto& handle : shader_handles)
+        {
+            // Cast to Vulkan shader
+            Vulkan::Shader* shader = dynamic_cast<Vulkan::Shader*>(handle.Get());
+
+            for (const auto& entry : shader->GetEntryPoints())
+            {
+                // Get module reference
+                modules.emplace_back(shader->GetModule(entry));
+
+                // Build create info structure
+                vk::PipelineShaderStageCreateInfo cInfo{};
+                cInfo.module = modules.back();
+                cInfo.pName = entry.name.c_str();
+                cInfo.stage = GetVulkanPipelineStage(entry.stage);
+
+                stage_create_infos.push_back(cInfo);
+            }
+        }
+
+        // Slice the config to fit the vulkan config structure
+        vk::GraphicsPipelineCreateInfo cInfo(config);
+
+        // Attach shader stage infos
+        cInfo.stageCount = static_cast<u32>(stage_create_infos.size());
+        cInfo.pStages = stage_create_infos.data();
+
+        // TODO: Implement use of Pipeline Cache
+
+        // Create the pipeline
+        return vk::raii::Pipeline(m_logical_device, nullptr, cInfo, config.alloc_callbacks);
     }
 
     RenderPass::Resources Driver::ResolveRenderPassResources(const std::vector<GraphicsResource::Config*>& configs)
@@ -481,5 +592,19 @@ namespace Aurion::Vulkan
         }
 
         return resources;
+    }
+
+    vk::ShaderStageFlagBits Driver::GetVulkanPipelineStage(const Aurion::Shader::Stage& stage) const
+    {
+        switch (stage)
+        {
+            case Shader::Stage::Vertex: return vk::ShaderStageFlagBits::eVertex;
+            case Shader::TessellationControl: return vk::ShaderStageFlagBits::eTessellationControl;
+            case Shader::TessellationEval: return vk::ShaderStageFlagBits::eTessellationEvaluation;
+            case Shader::Geometry: return vk::ShaderStageFlagBits::eGeometry;
+            case Shader::Fragment: return vk::ShaderStageFlagBits::eFragment;
+            case Shader::Task: return vk::ShaderStageFlagBits::eTaskEXT;
+            case Shader::Mesh: return vk::ShaderStageFlagBits::eMeshEXT;
+        }
     }
 }

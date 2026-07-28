@@ -16,6 +16,21 @@ export namespace Aurion
     class Shader : public GraphicsResource
     {
     public:
+        // Supported shader languages
+        enum Language
+        {
+            HLSL = 0,
+            GLSL,
+            SPIRV
+        };
+
+        struct Macro
+        {
+            std::string key;
+            std::string value;
+        };
+
+        // Supported pipeline shader stages/types
         enum Stage
         {
             Vertex = 0,
@@ -37,6 +52,8 @@ export namespace Aurion
         {
             explicit Config() : GraphicsResource::Config(GraphicsResource::Shader) {};
 
+            Language lang = HLSL;
+            std::vector<Macro> defines{};
             std::vector<EntryPoint> entry_points{};
             std::string path{};
         };

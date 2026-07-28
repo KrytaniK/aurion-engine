@@ -49,6 +49,7 @@ endif ()
 target_link_libraries(aurion-engine PRIVATE glfw)
 target_link_libraries(aurion-engine PRIVATE aurion-core)
 target_link_libraries(aurion-engine PRIVATE ${Vulkan_LIBRARIES})
+target_link_libraries(aurion-engine PRIVATE shaderc_combined glslang SPIRV SPIRV-Tools SPIRV-Tools-opt)
 
 # Setting up build targets for find_package() support
 include(GNUInstallDirs)

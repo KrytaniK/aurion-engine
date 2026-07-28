@@ -2,6 +2,7 @@ module;
 
 #include <vulkan/vulkan_raii.hpp>
 #include <unordered_map>
+#include <vector>
 
 export module Aurion.Vulkan:Driver;
 
@@ -15,6 +16,7 @@ import :RenderPass;
 
 import :RenderTarget;
 import :Buffer;
+import :Pipeline;
 
 export namespace Aurion::Vulkan
 {
@@ -68,12 +70,24 @@ export namespace Aurion::Vulkan
         [[nodiscard]] vk::raii::Buffer AllocateBuffer(const Vulkan::Buffer::Config& config) const;
         [[nodiscard]] vk::raii::DeviceMemory AllocateBufferMemory(const vk::raii::Buffer& buffer, vk::MemoryPropertyFlags prop_flags) const;
 
-        [[nodiscard]] vk::raii::ShaderModule CreateShaderModule(const std::vector<char>& code) const;
+        [[nodiscard]] vk::raii::ShaderModule CreateShaderModule(
+            const std::string_view& path,
+            const std::vector<char>& code,
+            const Shader::Language& lang,
+            const Shader::EntryPoint& entry_point,
+            const std::vector<Shader::Macro>& defines
+        ) const;
+
+        [[nodiscard]] vk::raii::PipelineLayout BuildPipelineLayout(const vk::PipelineLayoutCreateInfo& info) const;
+        [[nodiscard]] vk::raii::Pipeline BuildGraphicsPipeline(const Vulkan::GraphicsPipeline::Config& config) const;
 
     private:
         // A helper function to create the application resources a render pass depends on
         [[nodiscard]] RenderPass::Resources ResolveRenderPassResources(const std::vector<GraphicsResource::Config*>& configs);
         //[[nodiscard]] vk::raii::CommandBuffer& ResolveRenderPassCommandBuffer(const RenderPassOp& op, const u32& channel, const u32& index);
+
+        // Vulkan Pipeline Helpers
+        [[nodiscard]] vk::ShaderStageFlagBits GetVulkanPipelineStage(const Aurion::Shader::Stage& stage) const;
 
     private:
         ResourceManager* m_resource_manager;

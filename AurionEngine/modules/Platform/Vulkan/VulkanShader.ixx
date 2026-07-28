@@ -2,16 +2,17 @@ module;
 
 #include <vulkan/vulkan_raii.hpp>
 #include <string>
+#include <unordered_map>
 
 export module Aurion.Vulkan:Shader;
 
 import Aurion.Graphics;
 import Aurion.FileSystem;
 
-import :Driver;
-
 export namespace Aurion::Vulkan
 {
+    class Driver;
+
     class Shader : public Aurion::Shader
     {
     public:
@@ -22,7 +23,7 @@ export namespace Aurion::Vulkan
         void Attach(const IGraphicsDriver* driver) override;
 
         [[nodiscard]] const std::vector<EntryPoint>& GetEntryPoints() const;
-        [[nodiscard]] const vk::raii::ShaderModule& GetModule() const;
+        [[nodiscard]] const vk::raii::ShaderModule& GetModule(const Shader::EntryPoint& entry) const;
 
     protected:
         bool OnLoad() override;
@@ -35,6 +36,6 @@ export namespace Aurion::Vulkan
         Config m_config;
         const Driver* m_driver;
         FSFile m_file_handle;
-        vk::raii::ShaderModule m_module;
+        std::unordered_map<Shader::Stage, vk::raii::ShaderModule> m_modules;
     };
 }

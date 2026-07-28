@@ -8,10 +8,10 @@ export module Aurion.Vulkan:Pipeline;
 import Aurion.Graphics;
 import Aurion.Types;
 
-import :Driver;
-
 export namespace Aurion::Vulkan
 {
+    class Driver;
+
     class Pipeline : public Aurion::Pipeline
     {
     public:
@@ -32,7 +32,7 @@ export namespace Aurion::Vulkan
 
         void Configure(const GraphicsResource::Config* properties) override = 0;
 
-        void Attach(const IGraphicsDriver* driver) final
+        void Attach(const IGraphicsDriver* driver) override = 0;
         {
             m_driver = static_cast<const Driver*>(driver);
         };
@@ -62,9 +62,16 @@ export namespace Aurion::Vulkan
         ~GraphicsPipeline() override;
 
         void Configure(const GraphicsResource::Config* properties) override;
+        void Attach(const IGraphicsDriver* driver) override;
 
     protected:
         bool OnLoad() override;
         bool OnUnload() override;
+
+    private:
+        Config m_config;
+        const Driver* m_driver;
+        ResourceManager* m_resource_manager;
+        std::vector<ResourceHandle<Aurion::Shader>> m_shader_handles;
     };
 }
