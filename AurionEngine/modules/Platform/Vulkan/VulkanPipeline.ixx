@@ -22,7 +22,7 @@ export namespace Aurion::Vulkan
 
             std::vector<std::string> shaders{}; // Shader references by name
             vk::PipelineLayoutCreateInfo layout_info{};
-            vk::AllocationCallbacks alloc_callbacks = nullptr;
+            vk::Optional<const vk::AllocationCallbacks> alloc_callbacks = nullptr;
             bool use_cache = false; // If enabled, uses a vk::raii::PipelineCache for allocation
         };
 
