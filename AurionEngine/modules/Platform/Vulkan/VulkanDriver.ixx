@@ -46,7 +46,7 @@ export namespace Aurion::Vulkan
         ResourceHandle<Shader> CreateShader(const std::string_view& id) override;
 
         // Creates a blank pipeline, tied to this driver.
-        ResourceHandle<Pipeline> CreatePipeline(const std::string_view& id, const Pipeline::Type& type) override;
+        ResourceHandle<Aurion::Pipeline> CreatePipeline(const std::string_view& id, const Pipeline::Type& type) override;
 
         // Resource Creation Utility Functions
         // -----------------------------------------------------

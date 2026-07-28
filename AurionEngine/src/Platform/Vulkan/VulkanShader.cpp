@@ -22,8 +22,7 @@ import Aurion.Types;
 namespace Aurion::Vulkan
 {
     Shader::Shader(const std::string_view& id)
-        : Aurion::Shader(id), m_driver(nullptr), m_file_handle(nullptr),
-            m_module(nullptr)
+        : Aurion::Shader(id), m_driver(nullptr), m_file_handle(nullptr)
     {}
 
     Shader::~Shader()
@@ -94,12 +93,12 @@ namespace Aurion::Vulkan
         return m_config.entry_points;
     }
 
-    const vk::raii::ShaderModule& Shader::GetModule(const Shader::EntryPoint& entry) const
+    const vk::raii::ShaderModule* Shader::GetModule(const Shader::EntryPoint& entry) const
     {
         if (!m_modules.contains(entry.stage))
-            return vk::raii::ShaderModule{nullptr};
+            return nullptr;
 
-        return m_modules.at(entry.stage);
+        return &m_modules.at(entry.stage);
     }
 
     bool Shader::OnLoad()

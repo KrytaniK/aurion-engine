@@ -23,7 +23,7 @@ export namespace Aurion::Vulkan
         void Attach(const IGraphicsDriver* driver) override;
 
         [[nodiscard]] const std::vector<EntryPoint>& GetEntryPoints() const;
-        [[nodiscard]] const vk::raii::ShaderModule& GetModule(const Shader::EntryPoint& entry) const;
+        [[nodiscard]] const vk::raii::ShaderModule* GetModule(const Shader::EntryPoint& entry) const;
 
     protected:
         bool OnLoad() override;

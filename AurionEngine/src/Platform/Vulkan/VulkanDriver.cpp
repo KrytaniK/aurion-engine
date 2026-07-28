@@ -513,11 +513,14 @@ namespace Aurion::Vulkan
 
         // Retrieve handles to all shaders
         for (const auto& name : config.shaders)
-            shader_handles.push_back(m_resource_manager->Load<Aurion::Shader>(name));
+        {
+            auto handle = m_resource_manager->Load<Aurion::Shader, Vulkan::Shader>(name);
+            shader_handles.push_back(handle);
+        }
 
         // Build create info structures
         std::vector<vk::PipelineShaderStageCreateInfo> stage_create_infos{};
-        std::vector<const vk::raii::ShaderModule&> modules;
+        std::vector<const vk::raii::ShaderModule*> modules;
         for (auto& handle : shader_handles)
         {
             // Cast to Vulkan shader
@@ -526,11 +529,11 @@ namespace Aurion::Vulkan
             for (const auto& entry : shader->GetEntryPoints())
             {
                 // Get module reference
-                modules.emplace_back(shader->GetModule(entry));
+                modules.push_back(shader->GetModule(entry));
 
                 // Build create info structure
                 vk::PipelineShaderStageCreateInfo cInfo{};
-                cInfo.module = modules.back();
+                cInfo.module = *modules.back();
                 cInfo.pName = entry.name.c_str();
                 cInfo.stage = GetVulkanPipelineStage(entry.stage);
 
@@ -605,6 +608,7 @@ namespace Aurion::Vulkan
             case Shader::Fragment: return vk::ShaderStageFlagBits::eFragment;
             case Shader::Task: return vk::ShaderStageFlagBits::eTaskEXT;
             case Shader::Mesh: return vk::ShaderStageFlagBits::eMeshEXT;
+            default: return vk::ShaderStageFlagBits::eVertex;
         }
     }
 }

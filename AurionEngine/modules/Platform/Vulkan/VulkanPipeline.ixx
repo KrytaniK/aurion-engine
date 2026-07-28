@@ -5,6 +5,7 @@ module;
 
 export module Aurion.Vulkan:Pipeline;
 
+import Aurion.Resources;
 import Aurion.Graphics;
 import Aurion.Types;
 
@@ -33,9 +34,6 @@ export namespace Aurion::Vulkan
         void Configure(const GraphicsResource::Config* properties) override = 0;
 
         void Attach(const IGraphicsDriver* driver) override = 0;
-        {
-            m_driver = static_cast<const Driver*>(driver);
-        };
 
     protected:
         bool OnLoad() override = 0;
