@@ -9,6 +9,7 @@ import Aurion.Window;
 import Aurion.Types;
 
 import :GraphicsResource;
+import :Texture;
 
 export namespace Aurion
 {
@@ -19,11 +20,7 @@ export namespace Aurion
         {
             Config() : GraphicsResource::Config(GraphicsResource::RenderTarget) {}
 
-            Window* window = nullptr;
-            u32 width = 0;
-            u32 height = 0;
             u32 frames_in_flight = 3;
-            bool vSync_enabled = true;
         };
 
     public:
@@ -34,10 +31,11 @@ export namespace Aurion
 
         void Attach(const IGraphicsDriver* driver) override = 0;
 
-        virtual void Validate() = 0;
+        virtual void SwapBuffers() = 0;
 
         [[nodiscard]] virtual u32 GetWidth() const = 0;
         [[nodiscard]] virtual u32 GetHeight() const = 0;
+        [[nodiscard]] virtual u32 GetDepth() const = 0;
 
     protected:
         bool OnLoad() override = 0;

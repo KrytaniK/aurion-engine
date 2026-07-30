@@ -14,15 +14,6 @@ namespace Aurion
         m_graphics_driver.reset(nullptr);
     }
 
-    void Renderer::ResolveFrameGraph(const FrameGraph& graph)
-    {
-        if (!m_graphics_driver)
-            throw std::runtime_error("[Renderer] Failed to build graphics pipeline: No Graphics API specified!");
-
-        // Forward the pipeline description to the backend API driver
-        m_graphics_driver->ResolveFrameGraph(graph);
-    }
-
     WindowHandle Renderer::OpenWindow(const WindowProperties& properties)
     {
         if (!m_window_driver)

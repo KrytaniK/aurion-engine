@@ -3,6 +3,7 @@ module;
 #include <vulkan/vulkan_raii.hpp>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 export module Aurion.Vulkan:Driver;
 
@@ -14,8 +15,9 @@ import :Config;
 import :Queue;
 import :RenderPass;
 
-import :RenderTarget;
 import :Buffer;
+import :Texture;
+import :RenderTarget;
 import :Pipeline;
 
 export namespace Aurion::Vulkan
@@ -30,14 +32,14 @@ export namespace Aurion::Vulkan
         void RecordCommands() override;
         void EndFrame() override;
 
-        // Pipeline Generation From RenderGraph Output
-        void ResolveFrameGraph(const FrameGraph& graph) override;
-
         // Resource Creation
         // -----------------------------------------------------
 
         // Creates a blank buffer, tied to this driver.
         ResourceHandle<Aurion::Buffer> CreateBuffer(const std::string_view& id) override;
+
+        // Creates a blank texture, tied to this driver.
+        ResourceHandle<Aurion::Texture> CreateTexture(const std::string_view& id) override;
 
         // Creates a blank render target, tied to this driver.
         ResourceHandle<Aurion::RenderTarget> CreateRenderTarget(const std::string_view& id) override;
@@ -48,8 +50,30 @@ export namespace Aurion::Vulkan
         // Creates a blank pipeline, tied to this driver.
         ResourceHandle<Aurion::Pipeline> CreatePipeline(const std::string_view& id, const Pipeline::Type& type) override;
 
+        // Synchronization Primitives
+
+        [[nodiscard]] vk::raii::Semaphore CreateSemaphore(const vk::SemaphoreCreateInfo& info) const;
+        [[nodiscard]] vk::raii::Fence CreateFence(const vk::FenceCreateInfo& info) const;
+
         // Resource Creation Utility Functions
         // -----------------------------------------------------
+
+        // Allocation
+
+        [[nodiscard]] std::shared_ptr<vk::raii::DeviceMemory> AllocateDeviceMemory(
+            const vk::MemoryRequirements& mem_reqs,
+            const vk::MemoryPropertyFlags& prop_flags
+        ) const;
+
+        [[nodiscard]] vk::raii::Buffer AllocateBuffer(const Vulkan::Buffer::Config& config) const;
+
+        [[nodiscard]] vk::raii::Image AllocateImage(const Vulkan::Texture::Config& config) const;
+
+        [[nodiscard]] vk::raii::ImageView AllocateImageView(const vk::Image& image, const vk::ImageViewCreateInfo& config) const;
+
+        // Memory Binding
+
+        [[nodiscard]] vk::raii::DeviceMemory AllocateBufferMemory(const vk::raii::Buffer& buffer, vk::MemoryPropertyFlags prop_flags) const;
 
         // Ensures the provided surface can be presented to
         void ValidatePresentSupport(const vk::raii::SurfaceKHR& surface) const;
@@ -58,17 +82,9 @@ export namespace Aurion::Vulkan
 
         [[nodiscard]] vk::raii::SwapchainKHR CreateSwapchain(
             const vk::raii::SurfaceKHR& surface,
-            const RenderTarget::Config& properties,
+            const RenderTarget::SwapchainConfig& properties,
             vk::raii::SwapchainKHR* old_swapchain = nullptr
         ) const;
-
-        [[nodiscard]] std::vector<vk::raii::ImageView> CreateImageViews(
-            const std::span<vk::Image>& images,
-            const RenderTarget::Config& properties
-        ) const;
-
-        [[nodiscard]] vk::raii::Buffer AllocateBuffer(const Vulkan::Buffer::Config& config) const;
-        [[nodiscard]] vk::raii::DeviceMemory AllocateBufferMemory(const vk::raii::Buffer& buffer, vk::MemoryPropertyFlags prop_flags) const;
 
         [[nodiscard]] vk::raii::ShaderModule CreateShaderModule(
             const std::string_view& path,
@@ -82,9 +98,6 @@ export namespace Aurion::Vulkan
         [[nodiscard]] vk::raii::Pipeline BuildGraphicsPipeline(const Vulkan::GraphicsPipeline::Config& config) const;
 
     private:
-        // A helper function to create the application resources a render pass depends on
-        [[nodiscard]] RenderPass::Resources ResolveRenderPassResources(const std::vector<GraphicsResource::Config*>& configs);
-        //[[nodiscard]] vk::raii::CommandBuffer& ResolveRenderPassCommandBuffer(const RenderPassOp& op, const u32& channel, const u32& index);
 
         // Vulkan Pipeline Helpers
         [[nodiscard]] vk::ShaderStageFlagBits GetVulkanPipelineStage(const Aurion::Shader::Stage& stage) const;

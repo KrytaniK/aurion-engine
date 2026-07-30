@@ -20,6 +20,7 @@ namespace Aurion::Vulkan
 
         // Generate the buffer object
         m_buffer = m_driver->AllocateBuffer(m_config);
+
         // Allocate buffer memory
         m_buffer_memory = m_driver->AllocateBufferMemory(m_buffer, m_config.properties);
 

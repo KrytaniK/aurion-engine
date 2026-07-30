@@ -9,19 +9,20 @@ export module Aurion.Vulkan:RenderPass;
 import Aurion.Graphics;
 import Aurion.Resources;
 
+import :Buffer;
 import :RenderTarget;
+import :Pipeline;
 
 export namespace Aurion::Vulkan
 {
-    struct FrameContext;
-    typedef std::function<void(const FrameContext&)> RenderPassExecFn;
+    typedef std::function<void(const vk::raii::CommandBuffer&)> RenderPassExecFn;
 
     class RenderPass
     {
     public:
         struct Config : Aurion::RenderPass::Config
         {
-            // Pipeline Information
+            // Pipeline names
             std::vector<std::string> pipelines;
 
             // Queue/Command Buffer Selection
@@ -31,27 +32,16 @@ export namespace Aurion::Vulkan
             RenderPassExecFn OnExecute = nullptr; // The execution function for this render pass
         };
 
-        struct Resources
-        {
-            std::vector<ResourceHandle<Buffer>> buffers;
-            // std::vector<ResourceHandle<bool>> textures;
-            // std::vector<ResourceHandle<bool>> samplers;
-            std::vector<ResourceHandle<RenderTarget>> render_targets;
-            // std::vector<ResourceHandle<bool>> graphics_pipelines;
-            // std::vector<ResourceHandle<bool>> compute_pipelines;
-            // std::vector<ResourceHandle<bool>> raytrace_pipelines;
-        };
-
     public:
+        explicit RenderPass(const Config& config);
+        ~RenderPass() = default;
+
+        void Execute(const vk::raii::CommandBuffer& cmd);
 
     private:
-
-    };
-
-    struct FrameContext
-    {
-        const vk::raii::CommandBuffer& cmd_buffer;
-        RenderPass::Resources inputs;
-        RenderPass::Resources outputs;
+        RenderPassExecFn m_OnExecute;
+        std::vector<GraphicsResource*> inputs;
+        std::vector<GraphicsResource*> outputs;
+        std::vector<ResourceHandle<Pipeline>> pipelines;
     };
 }

@@ -26,11 +26,11 @@ export namespace Aurion
         virtual void RecordCommands() = 0;
         virtual void EndFrame() = 0;
 
-        // Pipeline Generation From RenderGraph Output
-        virtual void ResolveFrameGraph(const FrameGraph& graph) = 0;
-
         // Creates a blank buffer resource
         virtual ResourceHandle<Buffer> CreateBuffer(const std::string_view& id) = 0;
+
+        // Creates a blank texture, tied to this driver.
+        virtual ResourceHandle<Aurion::Texture> CreateTexture(const std::string_view& id) = 0;
 
         // Creates a blank render target resource
         virtual ResourceHandle<RenderTarget> CreateRenderTarget(const std::string_view& id) = 0;

@@ -203,7 +203,7 @@ export namespace Aurion
     template <typename T>
     ResourceHandle<T>::~ResourceHandle()
     {
-        if (!m_resource_manager) return;
+        if (!m_resource_manager || !m_resource) return;
 
         // Release the held resource, if available
         m_resource_manager->Release<T>(m_resource->GetId());

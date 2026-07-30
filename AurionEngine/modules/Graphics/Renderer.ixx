@@ -24,9 +24,6 @@ export namespace Aurion
         template <typename T, typename... Args>
         void ConfigureDriver(Args&&... args);
 
-        // Pipeline Generation From RenderGraph Output
-        void ResolveFrameGraph(const FrameGraph& graph);
-
         // Window-Specific Operations
         WindowHandle OpenWindow(const WindowProperties& properties);
         void CloseWindow(const u64& window_id);

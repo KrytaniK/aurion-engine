@@ -179,42 +179,25 @@ namespace Aurion::Vulkan
 
     }
 
-    void Driver::ResolveFrameGraph(const FrameGraph& graph)
-    {
-        std::vector<FrameContext> contexts;
-
-        std::vector<GraphicsResource::Config*> inputs{};
-        std::vector<GraphicsResource::Config*> outputs{};
-        for (const auto pass : graph.pass_descriptions)
-        {
-            // Get all input resource descriptions
-            for (const auto& name : pass->inputs)
-                for (const auto& desc : graph.resource_descriptions)
-                    if (name == desc->name)
-                        inputs.push_back(desc.get());
-
-            // Get all output resource descriptions
-            for (const auto& name : pass->outputs)
-                for (const auto& desc : graph.resource_descriptions)
-                    if (name == desc->name)
-                        outputs.push_back(desc.get());
-
-            // Create render pass context; Resolving the command buffer reference and resource handles
-            // contexts.emplace_back(
-            //     ResolveRenderPassCommandBuffer(pass->op_type, pass->channel_index, pass->command_buffer_index),
-            //     ResolveRenderPassResources(inputs),
-            //     ResolveRenderPassResources(outputs)
-            // );
-
-            inputs.clear();
-            outputs.clear();
-        }
-    }
-
     ResourceHandle<Aurion::Buffer> Driver::CreateBuffer(const std::string_view& id)
     {
         // Buffers are stored as application resources
         auto handle = m_resource_manager->Load<Aurion::Buffer, Vulkan::Buffer>(id);
+
+        // If the handle is invalid, simply return it. This should only happen when
+        //  resource creation failed.
+        if (!handle.IsValid()) return handle;
+
+        // Attach this driver
+        handle->Attach(this);
+
+        return handle;
+    }
+
+    ResourceHandle<Aurion::Texture> Driver::CreateTexture(const std::string_view& id)
+    {
+        // Textures are stored as application resources
+        auto handle = m_resource_manager->Load<Aurion::Texture, Vulkan::Texture>(id);
 
         // If the handle is invalid, simply return it. This should only happen when
         //  resource creation failed.
@@ -282,6 +265,92 @@ namespace Aurion::Vulkan
         return handle;
     }
 
+    vk::raii::Semaphore Driver::CreateSemaphore(const vk::SemaphoreCreateInfo& info) const
+    {
+        return vk::raii::Semaphore(m_logical_device, info);
+    }
+
+    vk::raii::Fence Driver::CreateFence(const vk::FenceCreateInfo& info) const
+    {
+        return vk::raii::Fence(m_logical_device, info);
+    }
+
+    std::shared_ptr<vk::raii::DeviceMemory> Driver::AllocateDeviceMemory(
+        const vk::MemoryRequirements& mem_reqs,
+        const vk::MemoryPropertyFlags& prop_flags) const
+    {
+        // Query the physical device for available memory properties
+        const vk::PhysicalDeviceMemoryProperties props = m_physical_device.getMemoryProperties();
+
+        // Ensure the required property flags are set
+        u32 mem_type_index = UINT32_MAX;
+        for (u32 i = 0; i < props.memoryTypeCount; i++)
+            if ((mem_reqs.memoryTypeBits & (1 << i)) && (props.memoryTypes[i].propertyFlags & prop_flags) == prop_flags)
+                mem_type_index = i;
+
+        if (mem_type_index == UINT32_MAX)
+            throw std::runtime_error("[Vulkan Driver] Failed to allocate device memory: No suitable memory type!");
+
+        vk::MemoryAllocateInfo alloc_info{};
+        alloc_info.allocationSize = mem_reqs.size;
+        alloc_info.memoryTypeIndex = mem_type_index;
+
+        return std::make_shared<vk::raii::DeviceMemory>(m_logical_device, alloc_info);
+    }
+
+    // Resource Allocation
+    // -------------------
+
+    vk::raii::Buffer Driver::AllocateBuffer(const Vulkan::Buffer::Config& config) const
+    {
+        vk::BufferCreateInfo bcInfo{};
+        bcInfo.size = config.size;
+        bcInfo.usage = config.usage;
+        bcInfo.sharingMode = config.sharing_mode;
+
+        return vk::raii::Buffer(m_logical_device, bcInfo);
+    }
+
+    vk::raii::Image Driver::AllocateImage(const Vulkan::Texture::Config& config) const
+    {
+        return vk::raii::Image(m_logical_device, config.image);
+    }
+
+    vk::raii::ImageView Driver::AllocateImageView(const vk::Image& image, const vk::ImageViewCreateInfo& config) const
+    {
+        return vk::raii::ImageView(m_logical_device, config);
+    }
+
+    // Memory Binding
+    // -------------------
+
+    vk::raii::DeviceMemory Driver::AllocateBufferMemory(
+        const vk::raii::Buffer& buffer,
+        vk::MemoryPropertyFlags prop_flags
+    ) const
+    {
+        vk::MemoryRequirements reqs = buffer.getMemoryRequirements();
+        vk::PhysicalDeviceMemoryProperties props = m_physical_device.getMemoryProperties();
+
+        u32 mem_type_index = UINT32_MAX;
+        for (u32 i = 0; i < props.memoryTypeCount; i++)
+            if ((reqs.memoryTypeBits & (1 << i)) && (props.memoryTypes[i].propertyFlags & prop_flags) == prop_flags)
+                mem_type_index = i;
+
+        if (mem_type_index == UINT32_MAX)
+            throw std::runtime_error("[Vulkan Driver] Failed to map buffer memory: No suitable memory type!");
+
+        vk::MemoryAllocateInfo alloc_info{};
+        alloc_info.allocationSize = reqs.size;
+        alloc_info.memoryTypeIndex = mem_type_index;
+
+        return vk::raii::DeviceMemory(m_logical_device, alloc_info);
+    }
+
+    // Swapchain Functions
+    // -------------------
+
+
     vk::raii::SurfaceKHR Driver::CreateWindowSurface(Window* window) const
     {
         if (!m_CreateSurfaceFn)
@@ -310,22 +379,23 @@ namespace Aurion::Vulkan
 
     vk::raii::SwapchainKHR Driver::CreateSwapchain(
             const vk::raii::SurfaceKHR& surface,
-            const RenderTarget::Config& properties,
+            const RenderTarget::SwapchainConfig& properties,
             vk::raii::SwapchainKHR* old_swapchain
     ) const {
         auto capabilities = m_physical_device.getSurfaceCapabilitiesKHR(*surface);
+        auto& win_props = properties.window->GetProperties();
 
         std::vector<vk::SurfaceFormatKHR> available_formats = m_physical_device.getSurfaceFormatsKHR(*surface);
         std::vector<vk::PresentModeKHR> available_present_modes = m_physical_device.getSurfacePresentModesKHR(*surface);
 
         assert(!available_formats.empty() && "[Vulkan Driver] No available surface formats");
 
-        // Attempt to find an SRGB format
+        // Attempt to find desired format
         const auto formatIt = std::ranges::find_if(
             available_formats,
             [&](const auto& format)
             {
-                return format.format == properties.image.format &&
+                return format.format == properties.format &&
                     format.colorSpace == properties.color_space;
             }
         );
@@ -333,7 +403,7 @@ namespace Aurion::Vulkan
         // Default to first available in all other cases
         const auto& chosen_format = formatIt != available_formats.end() ? *formatIt : available_formats.at(0);
 
-        // Choose a presentation mode (Try to get fastest, most stable mode, defaulting to
+        // Choose a presentation mode (Try to get desired mode, defaulting to
         //      traditional vertical sync when not available)
         const auto& chosen_present_mode = std::ranges::any_of(
             available_present_modes,
@@ -350,8 +420,8 @@ namespace Aurion::Vulkan
         else
         {
             chosen_extent = vk::Extent2D{
-                std::clamp<uint32_t>(properties.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
-                std::clamp<uint32_t>(properties.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
+                std::clamp<uint32_t>(win_props.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+                std::clamp<uint32_t>(win_props.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
             };
         }
 
@@ -367,69 +437,16 @@ namespace Aurion::Vulkan
         scInfo.imageColorSpace = chosen_format.colorSpace;
         scInfo.imageExtent = chosen_extent;
         scInfo.imageArrayLayers = 1;
-        scInfo.imageUsage = properties.image.usage;
-        scInfo.imageSharingMode = properties.image.sharingMode;
+        scInfo.imageUsage = properties.usage;
+        scInfo.imageSharingMode = properties.sharing_mode;
         scInfo.preTransform = capabilities.currentTransform;
         scInfo.compositeAlpha = properties.composite_alpha;
-        scInfo.presentMode = properties.vSync_enabled ? vk::PresentModeKHR::eFifo : chosen_present_mode;
+        scInfo.presentMode = chosen_present_mode;
         scInfo.clipped = properties.clipped;
         scInfo.oldSwapchain = *old_swapchain; // Used in swapchain recreation
 
         // Create swapchain and retrieve images
         return vk::raii::SwapchainKHR(m_logical_device, scInfo, nullptr);
-    }
-
-    std::vector<vk::raii::ImageView> Driver::CreateImageViews(
-        const std::span<vk::Image>& images,
-        const RenderTarget::Config& properties
-    ) const {
-        std::vector<vk::raii::ImageView> views{};
-
-        // Copy image view configuration
-        vk::ImageViewCreateInfo vcInfo = properties.view;
-
-        // And apply for each image
-        std::vector<vk::ImageViewCreateInfo> vcInfos{};
-        for (auto& image : images)
-        {
-            vcInfo.image = image;
-            views.emplace_back(m_logical_device, vcInfo);
-        }
-
-        return views;
-    }
-
-    vk::raii::Buffer Driver::AllocateBuffer(const Vulkan::Buffer::Config& config) const
-    {
-        vk::BufferCreateInfo bcInfo{};
-        bcInfo.size = config.size;
-        bcInfo.usage = config.usage;
-        bcInfo.sharingMode = config.sharing_mode;
-
-        return vk::raii::Buffer(m_logical_device, bcInfo);
-    }
-
-    vk::raii::DeviceMemory Driver::AllocateBufferMemory(
-        const vk::raii::Buffer& buffer,
-        vk::MemoryPropertyFlags prop_flags
-    ) const
-    {
-        vk::MemoryRequirements reqs = buffer.getMemoryRequirements();
-        vk::PhysicalDeviceMemoryProperties props = m_physical_device.getMemoryProperties();
-
-        u32 mem_type_index = UINT32_MAX;
-        for (u32 i = 0; i < props.memoryTypeCount; i++)
-            if ((reqs.memoryTypeBits & (1 << i)) && (props.memoryTypes[i].propertyFlags & prop_flags) == prop_flags)
-                mem_type_index = i;
-
-        if (mem_type_index == UINT32_MAX)
-            throw std::runtime_error("[Vulkan Driver] Failed to map buffer memory: No suitable memory type!");
-
-        vk::MemoryAllocateInfo alloc_info{};
-        alloc_info.allocationSize = reqs.size;
-        alloc_info.memoryTypeIndex = mem_type_index;
-
-        return vk::raii::DeviceMemory(m_logical_device, alloc_info);
     }
 
     vk::raii::ShaderModule Driver::CreateShaderModule(
@@ -542,7 +559,7 @@ namespace Aurion::Vulkan
         }
 
         // Slice the config to fit the vulkan config structure
-        vk::GraphicsPipelineCreateInfo cInfo(config);
+        vk::GraphicsPipelineCreateInfo cInfo(*config);
 
         // Attach shader stage infos
         cInfo.stageCount = static_cast<u32>(stage_create_infos.size());
@@ -552,49 +569,6 @@ namespace Aurion::Vulkan
 
         // Create the pipeline
         return vk::raii::Pipeline(m_logical_device, nullptr, cInfo, config.alloc_callbacks);
-    }
-
-    RenderPass::Resources Driver::ResolveRenderPassResources(const std::vector<GraphicsResource::Config*>& configs)
-    {
-        RenderPass::Resources resources{};
-
-        for (const auto& config : configs)
-        {
-            switch (config->GetType())
-            {
-            case GraphicsResource::None:
-                throw std::runtime_error("[Renderer] Failed to build render pipeline: Unknown resource type for \"" + config->name + "\".");
-            case GraphicsResource::Buffer:
-                {
-
-                    break;
-                }
-            case GraphicsResource::RenderTarget:
-                {
-                    const auto handle = m_resource_manager->Load<RenderTarget>(config->name);
-                    handle->Configure(static_cast<RenderTarget::Config*>(config)); // Configure render target
-                    handle->Attach(nullptr); // Create internal render target resources
-                    resources.render_targets.push_back(std::move(handle));
-                    break;
-                }
-            case GraphicsResource::Texture:
-                {
-
-                    break;
-                }
-            case GraphicsResource::Sampler:
-                {
-
-                    break;
-                }
-            case GraphicsResource::Shader:
-                break;
-            case GraphicsResource::Pipeline:
-                break;
-            }
-        }
-
-        return resources;
     }
 
     vk::ShaderStageFlagBits Driver::GetVulkanPipelineStage(const Aurion::Shader::Stage& stage) const

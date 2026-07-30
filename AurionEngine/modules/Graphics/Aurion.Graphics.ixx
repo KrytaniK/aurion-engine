@@ -7,6 +7,7 @@ export import :RenderPass;
 export import :Renderer;
 
 export import :Buffer;
+export import :Texture;
 export import :RenderTarget;
 export import :Shader;
 export import :Pipeline;
