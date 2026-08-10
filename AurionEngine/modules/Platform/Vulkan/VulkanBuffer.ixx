@@ -1,6 +1,7 @@
 module;
 
 #include <vulkan/vulkan_raii.hpp>
+#include <memory>
 
 export module Aurion.Vulkan:Buffer;
 
@@ -33,6 +34,10 @@ export namespace Aurion::Vulkan
 
         [[nodiscard]] u32 GetSize() const override;
 
+        [[nodiscard]] vk::MemoryRequirements GetMemoryRequirements() const;
+
+        void BindDeviceMemory(const std::shared_ptr<vk::raii::DeviceMemory>& memory, const u32& offset);
+
         // Convenience Utility for internal buffer access
         const vk::raii::Buffer& operator*() const { return m_buffer; }
 
@@ -44,6 +49,6 @@ export namespace Aurion::Vulkan
         Config m_config;
         const Driver* m_driver{};
         vk::raii::Buffer m_buffer;
-        vk::raii::DeviceMemory m_buffer_memory;
+        std::shared_ptr<vk::raii::DeviceMemory> m_buffer_memory;
     };
 }

@@ -28,9 +28,7 @@ export namespace Aurion::Vulkan
         explicit Driver(const DriverConfig& config);
         ~Driver() override;
 
-        void BeginFrame() override;
-        void RecordCommands() override;
-        void EndFrame() override;
+        void DrawFrame(const RenderGraph* graph) override;
 
         // Resource Creation
         // -----------------------------------------------------
@@ -69,11 +67,7 @@ export namespace Aurion::Vulkan
 
         [[nodiscard]] vk::raii::Image AllocateImage(const Vulkan::Texture::Config& config) const;
 
-        [[nodiscard]] vk::raii::ImageView AllocateImageView(const vk::Image& image, const vk::ImageViewCreateInfo& config) const;
-
-        // Memory Binding
-
-        [[nodiscard]] vk::raii::DeviceMemory AllocateBufferMemory(const vk::raii::Buffer& buffer, vk::MemoryPropertyFlags prop_flags) const;
+        [[nodiscard]] vk::raii::ImageView AllocateImageView(const vk::Image& image, vk::ImageViewCreateInfo& config) const;
 
         // Ensures the provided surface can be presented to
         void ValidatePresentSupport(const vk::raii::SurfaceKHR& surface) const;
@@ -110,6 +104,9 @@ export namespace Aurion::Vulkan
         vk::raii::Device m_logical_device;
         std::unordered_map<u32, QueueFamily> m_queue_families;
         SurfaceCreateFn m_CreateSurfaceFn;
-        std::unordered_map<u64, vk::raii::SurfaceKHR> m_surfaces;
+        std::vector<vk::raii::Fence> m_render_fences;
+        u32 m_max_frames_in_flight;
+        u32 m_frame_index;
+        Queue m_graphics_queue;
     };
 }

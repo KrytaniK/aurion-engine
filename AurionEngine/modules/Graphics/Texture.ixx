@@ -17,7 +17,7 @@ export namespace Aurion
 
             u32 width = 0;
             u32 height = 0;
-            u32 depth = 0;
+            u32 depth = 1;
         };
 
     public:
@@ -27,8 +27,8 @@ export namespace Aurion
         void Configure(const GraphicsResource::Config* properties) override = 0;
         void Attach(const IGraphicsDriver* driver) override = 0;
 
-        virtual u32 GetWidth() const = 0;
-        virtual u32 GetHeight() const = 0;
+        [[nodiscard]] virtual u32 GetWidth() const = 0;
+        [[nodiscard]] virtual u32 GetHeight() const = 0;
 
     protected:
         bool OnLoad() override = 0;

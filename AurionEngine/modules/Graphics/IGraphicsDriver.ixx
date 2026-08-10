@@ -22,9 +22,7 @@ export namespace Aurion
     public:
         virtual ~IGraphicsDriver() = default;
 
-        virtual void BeginFrame() = 0;
-        virtual void RecordCommands() = 0;
-        virtual void EndFrame() = 0;
+        virtual void DrawFrame(const RenderGraph* graph) = 0;
 
         // Creates a blank buffer resource
         virtual ResourceHandle<Buffer> CreateBuffer(const std::string_view& id) = 0;

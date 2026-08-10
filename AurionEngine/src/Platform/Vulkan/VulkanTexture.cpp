@@ -1,5 +1,6 @@
 module;
 
+#include <AurionLog.h>
 #include <vulkan/vulkan_raii.hpp>
 #include <string>
 
@@ -50,12 +51,18 @@ namespace Aurion::Vulkan
         // Cache config structure
         m_config = *dynamic_cast<const Config*>(properties);
 
+        // Configure the extent to always be the max of specified.
+        m_config.image.extent.width = std::max(m_config.width, m_config.image.extent.width);
+        m_config.image.extent.height = std::max(m_config.height, m_config.image.extent.height);
+        m_config.image.extent.depth = std::max(m_config.depth, m_config.image.extent.depth);
+
         // Generate image, if not already bound
         m_image = m_driver->AllocateImage(m_config);
+        AURION_TRACE("[Vulkan] Texture '%s' created.", m_config.name.c_str());
 
-        // Generate image view
-        m_config.view.image = m_image;
-        m_view = m_driver->AllocateImageView(m_image, m_config.view);
+        // // Generate image view
+        // m_config.view.image = m_image;
+        // m_view = m_driver->AllocateImageView(m_image, m_config.view);
     }
 
     void Texture::Attach(const IGraphicsDriver* driver)
@@ -81,6 +88,11 @@ namespace Aurion::Vulkan
     u32 Texture::GetHeight() const
     {
         return m_config.width;
+    }
+
+    const vk::raii::Image& Texture::GetImage() const
+    {
+        return m_image;
     }
 
     const vk::raii::ImageView& Texture::GetView() const

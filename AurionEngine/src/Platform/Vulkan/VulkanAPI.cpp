@@ -26,6 +26,11 @@ namespace Aurion::Vulkan
         return m_instance;
     }
 
+    std::shared_ptr<Vulkan::Driver> API::CreateDriver(const Vulkan::DriverConfig& config)
+    {
+        return std::make_shared<Vulkan::Driver>(config);
+    }
+
     void API::ValidateInstanceExtensions() const
     {
         auto extensionProperties = m_context.enumerateInstanceExtensionProperties();
@@ -104,33 +109,36 @@ namespace Aurion::Vulkan
             auto queue_families = device.getQueueFamilyProperties();
             auto available_extensions = device.enumerateDeviceExtensionProperties();
 
-            AURION_WARN("[Vulkan] Device: %s", &dProps.deviceName);
-            for (const auto& ext : available_extensions)
-                AURION_INFO("[Vulkan] Ext: %s", &ext.extensionName);
+            AURION_TRACE("[Vulkan] Device Found: %s", &dProps.deviceName);
+
+            const bool meets_api_version = dProps.apiVersion >= required_props->min_api_version;
+            const bool is_preferred_type = dProps.deviceType == required_props->type;
+            const bool is_queue_compatible = std::ranges::any_of(queue_families, [&](const auto& qProps)
+                {
+                    return !!(qProps.queueFlags & required_props->queue_flags);
+                });
+            const bool has_all_extensions = std::ranges::all_of(required_props->extensions,
+                [&](const auto& required_ext)
+                {
+                    return std::ranges::any_of(available_extensions,
+                       [&required_ext](const auto& available_ext)
+                       {
+                           return strcmp(
+                               available_ext.extensionName,
+                               required_ext) == 0;
+                       });
+                });
 
             // Verify basic device requirements
             meets_basic_reqs =
                 // Verify API version compatibility
-                dProps.apiVersion >= required_props->min_api_version &&
+                meets_api_version &&
                 // Verify preferred GPU/CPU type
-                dProps.deviceType == required_props->type &&
+                is_preferred_type &&
                 // Verify compatibility with specified queue families
-                std::ranges::any_of(queue_families, [&](const auto& qProps)
-                    {
-                        return !!(qProps.queueFlags & required_props->queue_flags);
-                    }) &&
+                is_queue_compatible &&
                 // Verify required extension compatibility
-                std::ranges::all_of(required_props->extensions,
-                    [&](const auto& required_ext)
-                    {
-                        return std::ranges::any_of(available_extensions,
-                           [&required_ext](const auto& available_ext)
-                           {
-                               return strcmp(
-                                   available_ext.extensionName,
-                                   required_ext) == 0;
-                           });
-                    });
+                has_all_extensions;
 
             // NOTE: Device feature compatibility should be checked in the suitability function.
             return meets_basic_reqs && (suitability_fn ? suitability_fn(device) : true);

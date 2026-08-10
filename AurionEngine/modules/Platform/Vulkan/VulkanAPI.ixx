@@ -7,6 +7,7 @@ export module Aurion.Vulkan:API;
 import Aurion.Services;
 
 import :Config;
+import :Driver;
 
 export namespace Aurion::Vulkan
 {
@@ -27,6 +28,8 @@ export namespace Aurion::Vulkan
 
         const vk::raii::Context& GetContext();
         const vk::raii::Instance& GetInstance();
+
+        std::shared_ptr<Vulkan::Driver> CreateDriver(const Vulkan::DriverConfig& config);
 
         // Attempts to select a suitable GPU for Vulkan operations based on
         // the provided arguments, or the defaults if no arguments are specified.

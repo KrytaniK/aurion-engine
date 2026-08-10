@@ -38,5 +38,7 @@ export namespace Aurion
         // Binds this render graph to a transient/registered render target
         //  for presenting/copying
         virtual void Export(const std::string& render_target, const u32& version) = 0;
+
+        virtual const ResourceHandle<RenderTarget>& GetExportTarget() const = 0;
     };
 }

@@ -2,6 +2,7 @@ module;
 
 #include <vulkan/vulkan_raii.hpp>
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 export module Aurion.Vulkan:Shader;
@@ -15,6 +16,13 @@ export namespace Aurion::Vulkan
 
     class Shader : public Aurion::Shader
     {
+    public:
+        struct Config : Aurion::Shader::Config
+        {
+            std::vector<vk::VertexInputBindingDescription> vertex_bindings{};
+            std::vector<vk::DescriptorSetLayoutBinding> descriptor_bindings{};
+        };
+
     public:
         explicit Shader(const std::string_view& id);
         ~Shader() override;

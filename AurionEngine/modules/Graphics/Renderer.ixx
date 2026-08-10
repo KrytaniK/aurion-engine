@@ -24,12 +24,15 @@ export namespace Aurion
         template <typename T, typename... Args>
         void ConfigureDriver(Args&&... args);
 
+        [[nodiscard]] std::shared_ptr<IWindowDriver> GetWindowDriver() const;
+        [[nodiscard]] std::shared_ptr<IGraphicsDriver> GetGraphicsDriver() const;
+
         // Window-Specific Operations
         WindowHandle OpenWindow(const WindowProperties& properties);
         void CloseWindow(const u64& window_id);
 
         // Render a single frame
-        void DrawFrame() const;
+        void DrawFrame(const RenderGraph* graph) const;
 
         // Creates a blank buffer
         [[nodiscard]] ResourceHandle<Buffer> CreateBuffer(const std::string_view& id) const;
@@ -44,8 +47,8 @@ export namespace Aurion
         [[nodiscard]] ResourceHandle<Pipeline> CreatePipeline(const std::string_view& id, const Pipeline::Type& type) const;
 
     private:
-        std::unique_ptr<IWindowDriver> m_window_driver = nullptr; // API-Specific Window Driver (SDL, GLFW, etc.)
-        std::unique_ptr<IGraphicsDriver> m_graphics_driver = nullptr; // API-Specific Graphics Driver (Vulkan, OpenGL, etc.)
+        std::shared_ptr<IWindowDriver> m_window_driver = nullptr; // API-Specific Window Driver (SDL, GLFW, etc.)
+        std::shared_ptr<IGraphicsDriver> m_graphics_driver = nullptr; // API-Specific Graphics Driver (Vulkan, OpenGL, etc.)
     };
 
     template <typename T, typename... Args>

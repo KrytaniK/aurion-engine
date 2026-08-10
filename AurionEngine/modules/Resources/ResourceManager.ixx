@@ -21,7 +21,9 @@ export namespace Aurion
     template <typename T>
     class ResourceHandle
     {
-        static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
+        using value_type = T;
+
+        static_assert(std::is_base_of_v<Resource, value_type>, "T must derive from Resource");
 
     public:
         ResourceHandle() : m_resource(nullptr), m_resource_manager(nullptr) {};
@@ -42,12 +44,19 @@ export namespace Aurion
 
         T* Get() const;
 
+        template<typename U>
+        U* As() const;
+
         [[nodiscard]] bool IsValid() const;
 
         // Convenience Operators
         T* operator->() const { return Get(); }
         T& operator*() const { return *Get(); }
         explicit operator bool() const { return IsValid(); }
+
+        // Conversion Operators
+        template<typename U>
+        operator ResourceHandle<U>() const;
 
     private:
         Resource* m_resource;
@@ -228,10 +237,30 @@ export namespace Aurion
     }
 
     template <typename T>
+    template <typename U>
+    U* ResourceHandle<T>::As() const
+    {
+        static_assert(std::is_base_of_v<T, U>, "ResourceHandle: Specified type must derive from base type.");
+
+        return static_cast<U*>(m_resource);
+    }
+
+    template <typename T>
     bool ResourceHandle<T>::IsValid() const
     {
         return m_resource != nullptr;
-    };
+    }
+
+    template <typename T>
+    template <typename U>
+    ResourceHandle<T>::operator ResourceHandle<U>() const
+    {
+        static_assert(std::is_base_of_v<value_type, U>, "T must derive from U");
+
+        if (!m_resource || !m_resource_manager) return ResourceHandle<U>();
+
+        return ResourceHandle<U>(m_resource->GetId(), m_resource_manager);
+    }
 
     template <typename T>
     T* ResourceManager::GetResource(const std::string_view& resource_id)

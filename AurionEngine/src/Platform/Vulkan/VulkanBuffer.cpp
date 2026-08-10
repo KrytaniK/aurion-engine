@@ -1,5 +1,6 @@
 module;
 
+#include <vulkan/vulkan_raii.hpp>
 #include <string>
 #include <cstring>
 
@@ -20,12 +21,6 @@ namespace Aurion::Vulkan
 
         // Generate the buffer object
         m_buffer = m_driver->AllocateBuffer(m_config);
-
-        // Allocate buffer memory
-        m_buffer_memory = m_driver->AllocateBufferMemory(m_buffer, m_config.properties);
-
-        // Bind the buffer to the allocated memory
-        m_buffer.bindMemory(m_buffer_memory, 0);
     }
 
     void Buffer::Attach(const IGraphicsDriver* driver)
@@ -35,14 +30,25 @@ namespace Aurion::Vulkan
 
     void Buffer::Write(void* data, const u32& offset, const u32& size)
     {
-        void* mapped = m_buffer_memory.mapMemory(offset, m_config.size);
+        void* mapped = m_buffer_memory->mapMemory(offset, m_config.size);
         std::memcpy(mapped, data, m_config.size);
-        m_buffer_memory.unmapMemory();
+        m_buffer_memory->unmapMemory();
     }
 
     u32 Buffer::GetSize() const
     {
         return m_config.size;
+    }
+
+    vk::MemoryRequirements Buffer::GetMemoryRequirements() const
+    {
+        return m_buffer.getMemoryRequirements();
+    }
+
+    void Buffer::BindDeviceMemory(const std::shared_ptr<vk::raii::DeviceMemory>& memory, const u32& offset)
+    {
+        m_buffer_memory = memory;
+        m_buffer.bindMemory(*m_buffer_memory, offset);
     }
 
     bool Buffer::OnLoad()

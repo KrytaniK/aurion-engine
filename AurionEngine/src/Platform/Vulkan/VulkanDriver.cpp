@@ -21,15 +21,16 @@ namespace Aurion::Vulkan
 {
     Driver::Driver(const DriverConfig& config)
         : m_physical_device(config.physical_device),
-            m_logical_device(nullptr), m_CreateSurfaceFn(config.on_surface_create)
+            m_logical_device(nullptr), m_CreateSurfaceFn(config.on_surface_create),
+            m_max_frames_in_flight(config.interface.max_frames_in_flight), m_frame_index(0)
     {
-        // Ensure access to application resources
-        m_resource_manager = ServiceLocator::GetService<ResourceManager>();
-
         // Attempt to retrieve the Vulkan API Service
         Vulkan::API* api = ServiceLocator::GetService<Vulkan::API>();
         if (!api)
             throw std::runtime_error("[Vulkan Driver] Vulkan API Service is unavailable");
+
+        // Ensure access to application resources
+        m_resource_manager = ServiceLocator::GetService<ResourceManager>();
 
         // If available, grab references to the context and instance
         m_context = &api->GetContext();
@@ -128,6 +129,7 @@ namespace Aurion::Vulkan
         dcInfo.pQueueCreateInfos = create_queues.data();
         dcInfo.enabledExtensionCount = static_cast<u32>(config.interface.extensions.size());
         dcInfo.ppEnabledExtensionNames = config.interface.extensions.data();
+        dcInfo.pNext = config.interface.features;
 
         m_logical_device = vk::raii::Device(m_physical_device, dcInfo);
 
@@ -151,32 +153,161 @@ namespace Aurion::Vulkan
             qf.GenerateCommandPool(m_logical_device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
 
             // Allocate a command buffer for each queue in the family, scaled by the number of max in-flight frames
-            qf.AllocateCommandBuffers(m_logical_device, vk::CommandBufferLevel::ePrimary);
+            qf.AllocateCommandBuffers(m_logical_device, vk::CommandBufferLevel::ePrimary, m_max_frames_in_flight);
+
+            // Grab graphics queue reference
+            if ((qf_props.queueFlags & vk::QueueFlags(vk::QueueFlagBits::eGraphics)) != static_cast<vk::QueueFlags>(0))
+                m_graphics_queue = qf.GetQueue(m_logical_device, 0);
         }
+
+        // Allocate per-frame fences
+        vk::FenceCreateInfo fence_info{};
+        fence_info.flags = vk::FenceCreateFlagBits::eSignaled;
+
+        m_render_fences.reserve(m_max_frames_in_flight);
+        for (u32 i = 0; i < m_max_frames_in_flight; ++i)
+            m_render_fences.emplace(m_render_fences.begin() + i, m_logical_device, fence_info);
     }
 
     Driver::~Driver()
     {
-
+        // Wait for any GPU work to finish before destruction
+        m_logical_device.waitIdle();
     }
 
-    void Driver::BeginFrame()
+    void Driver::DrawFrame(const Aurion::RenderGraph* graph)
     {
-        // Waits on the previous frame
+        auto* rt = graph->GetExportTarget().As<Vulkan::RenderTarget>();
 
-        // Resets command buffer(s)
-    }
+        // -----------------------------
+        // ----- Frame Preparation -----
+        // -----------------------------
 
-    void Driver::RecordCommands()
-    {
-        // Iterates over all render passes
+        auto fence_result = m_logical_device.waitForFences(*m_render_fences[m_frame_index], vk::True, UINT64_MAX);
+        if (fence_result != vk::Result::eSuccess)
+            throw std::runtime_error("[Vulkan Driver] Failed to wait for render fence!");
 
-        // Records GPU operations on the command buffer(s) in question
-    }
+        // It's possible that the internal frame buffer gets invalidated. This can happen if the
+        //  swapchain gets recreated. In these cases, no work needs to be submitted this frame.
+        const u32 image_index = rt->SwapBuffers(m_frame_index);
+        if (image_index == UINT32_MAX)
+            return;
 
-    void Driver::EndFrame()
-    {
+        // Reset fence if work is being submitted
+        m_logical_device.resetFences(*m_render_fences[m_frame_index]);
 
+        // Build out a frame buffer context for the compiled render graph
+        // const FrameBuffer fb = {
+        //     .graphics = /* graphics cmd buffer ptr */,
+        //     .compute = /* compute cmd buffer ptr */,
+        //     .raytrace = /* raytrace cmd buffer ptr? */
+        // };
+
+        const auto& graphics_cmd_buffer = m_graphics_queue.command_buffers[m_frame_index];
+        graphics_cmd_buffer.reset();
+
+        // -----------------------------
+        // ----- Command Recording -----
+        // -----------------------------
+
+        graphics_cmd_buffer.begin({});
+
+        // TEMP! Pipeline barrier for swapchain images
+
+        /*void transition_image_layout(
+              uint32_t                imageIndex,
+              vk::ImageLayout         old_layout,
+              vk::ImageLayout         new_layout,
+              vk::AccessFlags2        src_access_mask,
+              vk::AccessFlags2        dst_access_mask,
+              vk::PipelineStageFlags2 src_stage_mask,
+              vk::PipelineStageFlags2 dst_stage_mask
+        )*/
+
+        vk::ImageSubresourceRange sr_range;
+        sr_range.aspectMask= vk::ImageAspectFlagBits::eColor;
+        sr_range.baseMipLevel = 0;
+        sr_range.levelCount = 1;
+        sr_range.baseArrayLayer = 0;
+        sr_range.layerCount = 1;
+
+        vk::ImageMemoryBarrier2 barrier{};
+        barrier.srcAccessMask = {};
+        barrier.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+        barrier.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        barrier.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        barrier.oldLayout = vk::ImageLayout::eUndefined;
+        barrier.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = rt->GetImage();
+        barrier.subresourceRange = sr_range;
+
+        vk::DependencyInfo dep_info{};
+        dep_info.imageMemoryBarrierCount = 1;
+        dep_info.pImageMemoryBarriers = &barrier;
+
+        graphics_cmd_buffer.pipelineBarrier2(dep_info);
+
+        // TEMP! Pipeline barrier for swapchain images
+
+        // TEMP! Pipeline barrier for swapchain images
+
+        barrier.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+        barrier.dstAccessMask = {};
+        barrier.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        barrier.dstStageMask = vk::PipelineStageFlagBits2::eBottomOfPipe;
+        barrier.oldLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = rt->GetImage();
+        barrier.subresourceRange = sr_range;
+
+        dep_info.imageMemoryBarrierCount = 1;
+        dep_info.pImageMemoryBarriers = &barrier;
+
+        graphics_cmd_buffer.pipelineBarrier2(dep_info);
+
+        // TEMP! Pipeline barrier for swapchain images
+
+        graphics_cmd_buffer.end();
+
+        // ----------------------------
+        // ----- Frame Submission -----
+        // ----------------------------
+
+        const bool can_present = rt->CanPresent();
+
+        // Graphics Submission
+        vk::SubmitInfo graphics_submit_info{};
+
+        graphics_submit_info.commandBufferCount = 1;
+        graphics_submit_info.pCommandBuffers = &*graphics_cmd_buffer;
+
+        const vk::PipelineStageFlags graphics_wait_dst_mask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+        graphics_submit_info.pWaitDstStageMask = &graphics_wait_dst_mask;
+
+        // Only swapchain images (presentable images) will contain semaphore objects
+        graphics_submit_info.waitSemaphoreCount = can_present ? : 0;
+        graphics_submit_info.pWaitSemaphores = can_present ? &**rt->GetWaitSemaphore(m_frame_index) : nullptr;
+        graphics_submit_info.signalSemaphoreCount = can_present ? : 0;
+        graphics_submit_info.pSignalSemaphores = can_present ? &**rt->GetSignalSemaphore(image_index) : nullptr;
+
+        m_graphics_queue.handle.submit(graphics_submit_info, *m_render_fences[m_frame_index]);
+
+        // ------------------------------
+        // ----- Frame Presentation -----
+        // ------------------------------
+
+        if (can_present)
+            rt->Present(m_graphics_queue.handle);
+
+        // ---------------------------
+        // ----- Frame Increment -----
+        // ---------------------------
+
+        m_frame_index = (m_frame_index + 1) % m_max_frames_in_flight;
     }
 
     ResourceHandle<Aurion::Buffer> Driver::CreateBuffer(const std::string_view& id)
@@ -316,36 +447,14 @@ namespace Aurion::Vulkan
         return vk::raii::Image(m_logical_device, config.image);
     }
 
-    vk::raii::ImageView Driver::AllocateImageView(const vk::Image& image, const vk::ImageViewCreateInfo& config) const
+    vk::raii::ImageView Driver::AllocateImageView(const vk::Image& image, vk::ImageViewCreateInfo& config) const
     {
+        config.image = image;
         return vk::raii::ImageView(m_logical_device, config);
     }
 
     // Memory Binding
     // -------------------
-
-    vk::raii::DeviceMemory Driver::AllocateBufferMemory(
-        const vk::raii::Buffer& buffer,
-        vk::MemoryPropertyFlags prop_flags
-    ) const
-    {
-        vk::MemoryRequirements reqs = buffer.getMemoryRequirements();
-        vk::PhysicalDeviceMemoryProperties props = m_physical_device.getMemoryProperties();
-
-        u32 mem_type_index = UINT32_MAX;
-        for (u32 i = 0; i < props.memoryTypeCount; i++)
-            if ((reqs.memoryTypeBits & (1 << i)) && (props.memoryTypes[i].propertyFlags & prop_flags) == prop_flags)
-                mem_type_index = i;
-
-        if (mem_type_index == UINT32_MAX)
-            throw std::runtime_error("[Vulkan Driver] Failed to map buffer memory: No suitable memory type!");
-
-        vk::MemoryAllocateInfo alloc_info{};
-        alloc_info.allocationSize = reqs.size;
-        alloc_info.memoryTypeIndex = mem_type_index;
-
-        return vk::raii::DeviceMemory(m_logical_device, alloc_info);
-    }
 
     // Swapchain Functions
     // -------------------
@@ -382,6 +491,9 @@ namespace Aurion::Vulkan
             const RenderTarget::SwapchainConfig& properties,
             vk::raii::SwapchainKHR* old_swapchain
     ) const {
+        // Make sure there's no GPU work happening. This can occur if a swapchain is getting recreated
+        m_logical_device.waitIdle();
+
         auto capabilities = m_physical_device.getSurfaceCapabilitiesKHR(*surface);
         auto& win_props = properties.window->GetProperties();
 

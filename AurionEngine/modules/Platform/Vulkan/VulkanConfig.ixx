@@ -49,12 +49,14 @@ export namespace Aurion::Vulkan
         // A list of queue type preferences, paired with the desired queue creation amount and its priority
         const std::vector<QueueDescription> queues{};
         const std::vector<const char*>& extensions{}; // Required device extensions (if any)
-        void* features = nullptr; // Required device features (if any)
+        vk::PhysicalDeviceFeatures2* features = nullptr; // Required device features (if any)
+        u32 max_frames_in_flight = 3; // Triple Buffering by default
     };
 
     // Handles extended Vulkan Driver configurations
     struct DriverConfig
     {
+
         vk::raii::PhysicalDevice physical_device = nullptr; // The GPU to use for Vulkan operations
         InterfaceConfig interface{};
         SurfaceCreateFn on_surface_create = nullptr;

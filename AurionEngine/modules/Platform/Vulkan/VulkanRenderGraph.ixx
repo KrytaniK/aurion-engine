@@ -1,5 +1,7 @@
 module;
 
+#include <vulkan/vulkan_raii.hpp>
+#include <memory>
 #include <vector>
 #include <span>
 #include <cstdint>
@@ -18,6 +20,8 @@ import :RenderTarget;
 
 export namespace Aurion::Vulkan
 {
+    class Driver;
+
     class RenderGraph : public Aurion::RenderGraph
     {
         template<typename R>
@@ -28,7 +32,7 @@ export namespace Aurion::Vulkan
         };
 
     public:
-        explicit RenderGraph();
+        explicit RenderGraph(const std::shared_ptr<IGraphicsDriver>& renderer);
         ~RenderGraph() override = default;
 
         void RegisterBuffer(const ResourceHandle<Aurion::Buffer>& buffer) override;
@@ -45,6 +49,8 @@ export namespace Aurion::Vulkan
         // Specifies which render target this graph should export
         void Export(const std::string& render_target, const u32& version) override;
 
+        const ResourceHandle<Aurion::RenderTarget>& GetExportTarget() const override;
+
     private:
         // Builds a dependency graph (as a DAG) from imported/transient resources and pass descriptions
         [[nodiscard]] std::vector<std::vector<u64>> BuildDependencyGraph() const;
@@ -55,17 +61,17 @@ export namespace Aurion::Vulkan
         // Sorts passes by index based on the provided dependency graph
         [[nodiscard]] std::vector<u64> TopologicallySortPasses(std::span<u8> mask) const;
 
-        void AliasResources(std::span<u64> execution_order) const;
+        void AliasResources(std::span<u64> execution_order);
 
     private:
-        ResourceManager* m_resource_manager;
+        std::shared_ptr<Driver> m_driver;
         std::vector<std::vector<u64>> m_dependency_graph;
         Aurion::RenderPass::ResourceRef m_export_target_ref;
-        ResourceHandle<Aurion::RenderTarget> m_export_target;
+        ResourceHandle<Aurion::RenderTarget> m_export_target; //
         std::vector<ResourceHandle<Aurion::Buffer>> m_buffers;
         std::vector<ResourceHandle<Aurion::RenderTarget>> m_render_targets;
-        std::vector<ResourceConfig<Vulkan::Buffer>> m_buffer_configs;
-        std::vector<ResourceConfig<Vulkan::RenderTarget>> m_render_target_configs;
-        std::vector<const Aurion::RenderPass::Config*> m_pass_descriptions;
+        std::vector<ResourceConfig<Vulkan::Buffer>> m_buffer_configs; //
+        std::vector<ResourceConfig<Vulkan::RenderTarget>> m_render_target_configs; //
+        std::vector<const Aurion::RenderPass::Config*> m_pass_descriptions; //
     };
 }

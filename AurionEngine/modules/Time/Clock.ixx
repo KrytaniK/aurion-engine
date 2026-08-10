@@ -35,4 +35,10 @@ export namespace Aurion
     private:
         Timepoint m_start;
     };
+
+    template <typename Rep, typename Period>
+    Clock::Duration<Rep, Period> Clock::ElapsedTime() const
+    {
+        return Clock::Duration<Rep, Period>(SteadyClock::now() - m_start);
+    }
 }

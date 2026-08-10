@@ -1,6 +1,7 @@
 module;
 
 #include <AurionLog.h>
+#include <vulkan/vulkan_raii.hpp>
 #include <vector>
 #include <ranges>
 #include <span>
@@ -17,10 +18,10 @@ import Aurion.Types;
 
 namespace Aurion::Vulkan
 {
-    RenderGraph::RenderGraph()
+    RenderGraph::RenderGraph(const std::shared_ptr<IGraphicsDriver>& driver)
         : Aurion::RenderGraph()
     {
-        m_resource_manager = ServiceLocator::GetService<ResourceManager>();
+        m_driver = std::dynamic_pointer_cast<Vulkan::Driver>(driver);
     }
 
     void RenderGraph::RegisterBuffer(const ResourceHandle<Aurion::Buffer>& buffer)
@@ -41,8 +42,14 @@ namespace Aurion::Vulkan
             m_buffers.size()
         );
 
-        // Then return an empty handle
-        return m_buffers.emplace_back();
+        // Generate an empty handle through the renderer
+        auto handle = m_driver->CreateBuffer(desc->name);
+
+        // Push a copy into the buffer array
+        m_buffers.push_back(handle);
+
+        // And return a reference to the copy
+        return m_buffers.back();
     }
 
     const ResourceHandle<Aurion::RenderTarget>& RenderGraph::CreateRenderTarget(const Aurion::RenderTarget::Config* desc)
@@ -53,8 +60,14 @@ namespace Aurion::Vulkan
             m_render_targets.size()
         );
 
-        // Then return an empty handle
-        return m_render_targets.emplace_back();
+        // Generate an empty handle through the renderer
+        auto handle = m_driver->CreateRenderTarget(desc->name);
+
+        // Push a copy into the render target array
+        m_render_targets.push_back(handle);
+
+        // And return a reference to the copy
+        return m_render_targets.back();
     }
 
     void RenderGraph::AddPass(const Aurion::RenderPass::Config* desc)
@@ -73,9 +86,9 @@ namespace Aurion::Vulkan
         // Then determine the pass execution order
         auto exec_order = TopologicallySortPasses(cull_mask);
 
-        AURION_WARN("Execution Order:");
+        AURION_TRACE("[Render Graph] Execution Order:");
         for (auto i : exec_order)
-            AURION_TRACE("%d: %s", i, m_pass_descriptions[i]->name.c_str());
+            AURION_TRACE("Pass %d: %s", i, m_pass_descriptions[i]->name.c_str());
 
         // Alias resources against the pass execution order
         AliasResources(exec_order);
@@ -91,8 +104,23 @@ namespace Aurion::Vulkan
             });
 
             if (it != pass->outputs.end())
-                m_export_target_ref = { render_target, version };
+                m_export_target_ref = { .name = render_target, .version = version };
         }
+
+        if (m_export_target_ref.name.empty())
+        {
+            AURION_WARN("[Vulkan Render Graph] Failed to export render target { name: %s, version: %d }: No output exists in the graph");
+            return;
+        }
+
+        for (const auto& target : m_render_targets)
+            if (target->GetName() == render_target)
+                m_export_target = target;
+    }
+
+    const ResourceHandle<Aurion::RenderTarget>& RenderGraph::GetExportTarget() const
+    {
+        return m_export_target;
     }
 
     std::vector<std::vector<u64>> RenderGraph::BuildDependencyGraph() const
@@ -101,19 +129,29 @@ namespace Aurion::Vulkan
 
         std::unordered_map<Aurion::RenderPass::ResourceRef, u64> writes{};
 
-        // First, register imported resources as available (written before graph execution)
-        for (const auto& buffer : m_buffers)
-            if (buffer.IsValid())
-                writes[{std::string(buffer->GetName()), 0}] = UINT64_MAX;
+        // Figure out which buffers are imported. Only transient buffers will have cached configs
+        std::vector<u8> imported_mask(m_buffers.size(), 1);
+        for (const auto& [_, index] : m_buffer_configs)
+            imported_mask[index] = 0;
 
-        for (const auto& rt : m_render_targets)
-            if (rt.IsValid())
-                writes[{std::string(rt->GetName()), 0}] = UINT64_MAX;
+        // If a buffer is imported, mark the resource as written to, with the base version
+        for (u64 i = 0; i < imported_mask.size(); ++i)
+            if (imported_mask[i])
+                writes[{std::string(m_buffers[i]->GetName()), 0}] = UINT64_MAX;
+
+        // Then do the same for render targets. Only transient render targets will have cached configs
+        imported_mask = std::vector<u8>(m_render_targets.size(), 1);
+        for (const auto& [_, index] : m_render_target_configs)
+            imported_mask[index] = 0;
+
+        for (u64 i = 0; i < imported_mask.size(); ++i)
+            if (imported_mask[i])
+                writes[{std::string(m_render_targets[i]->GetName()), 0}] = UINT64_MAX;
 
         // Then, map every resource to the pass that produces it
         for (u64 i = 0; i < m_pass_descriptions.size(); ++i)
             for (const auto& output : m_pass_descriptions[i]->outputs)
-                if (auto [_, success] = writes.try_emplace(output, i); !success)
+                if (auto [_, success] = writes.try_emplace(output, i); !success && writes.at(output) != UINT64_MAX)
                     throw std::runtime_error("[Vulkan::RenderGraph] Duplicate producer for resource '" + output.name + "', version " + std::to_string(output.version));
 
         // Then, analyze pass inputs to determine pass dependencies
@@ -148,7 +186,7 @@ namespace Aurion::Vulkan
     std::vector<u8> RenderGraph::CullPasses()
     {
         // If there's no export target, all passes are valid
-        if (m_export_target_ref.name.empty())
+        if (m_export_target_ref.version == UINT64_MAX)
             return std::vector<u8>(m_dependency_graph.size(), 1u);
 
         // Figure out which pass produces the exported render target
@@ -223,13 +261,13 @@ namespace Aurion::Vulkan
         return execution_order;
     }
 
-    void RenderGraph::AliasResources(std::span<u64> execution_order) const
+    void RenderGraph::AliasResources(std::span<u64> execution_order)
     {
         // NOTE: Only transient resources get aliased. Imported resources are ignored
         std::vector<std::pair<u64, u64>> buffer_lifetimes(m_buffer_configs.size(), { UINT64_MAX, UINT64_MAX });
         std::vector<std::pair<u64, u64>> rt_lifetimes(m_render_target_configs.size(), { UINT64_MAX, UINT64_MAX });
 
-        std::function determine_lifetime = [&](const u64& idx, const Aurion::RenderPass::ResourceRef& ref)
+        auto determine_lifetime = [&](const u64& idx, const Aurion::RenderPass::ResourceRef& ref)
         {
             // Check against all buffer configs
             for (u64 j = 0; j < m_buffer_configs.size(); ++j)
@@ -273,14 +311,63 @@ namespace Aurion::Vulkan
                 determine_lifetime(i, output);
         }
 
-        // Once lifetimes are available, figure out which resources can be
-        //  aliased
+        // TODO: Implement resource memory aliasing based on lifetime within the graph
 
-        // Then, for each alias-able group, figure out which is going to have the largest memory requirements
-        // NOTE: This is going to REQUIRE major modifications to the Vulkan code to work correctly.
-        //          First, transient render targets need to be able to bind to a VkDeviceMemory in isolation.
-        //          And the driver needs to be able to handle this use case.
-        //          For transient buffers, this won't be as hard, since the vulkan driver and buffer classes
-        //          mostly support this.
+        vk::MemoryRequirements mem_reqs;
+
+        // Create all buffers
+        Vulkan::Buffer* buffer = nullptr;
+        for (const auto& desc : m_buffer_configs)
+        {
+            // Grab the blank handle
+            auto& target = m_buffers[desc.index];
+            buffer = static_cast<Vulkan::Buffer*>(target.Get());
+
+            // Then configure
+            buffer->Configure(&desc.config);
+
+            // Get memory requirements
+            mem_reqs = buffer->GetMemoryRequirements();
+
+            // Need the driver to allocate and bind device memory
+            auto memory = m_driver->AllocateDeviceMemory(
+                mem_reqs,
+                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+            );
+
+            buffer->BindDeviceMemory(memory, 0);
+        }
+
+        // Create all render targets
+        Vulkan::RenderTarget* rt = nullptr;
+        for (auto& desc : m_render_target_configs)
+        {
+            // Grab the blank handle
+            auto& target = m_render_targets[desc.index];
+            rt = static_cast<Vulkan::RenderTarget*>(target.Get());
+
+            // Truncate all render targets to a single frame in flight.
+            if (desc.config.frames_in_flight > 1)
+            {
+                AURION_WARN("[Vulkan::RenderGraph] Transient Render Targets are limited to 1 in-flight-frame. Truncating Render Target '%s'", desc.config.name.c_str());
+                desc.config.frames_in_flight = 1;
+            }
+
+            // Then configure
+            rt->Configure(&desc.config);
+
+            // Get memory requirements
+            mem_reqs = rt->GetMemoryRequirements();
+
+            continue;
+
+            // Need the driver to allocate and bind device memory
+            auto memory = m_driver->AllocateDeviceMemory(
+                mem_reqs,
+                vk::MemoryPropertyFlagBits::eDeviceLocal
+            );
+
+            rt->BindDeviceMemory(memory, 0);
+        }
     }
 }

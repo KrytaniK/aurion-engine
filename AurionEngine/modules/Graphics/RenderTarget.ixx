@@ -20,7 +20,7 @@ export namespace Aurion
         {
             Config() : GraphicsResource::Config(GraphicsResource::RenderTarget) {}
 
-            u32 frames_in_flight = 3;
+            u32 frames_in_flight = 1;
         };
 
     public:
@@ -31,7 +31,8 @@ export namespace Aurion
 
         void Attach(const IGraphicsDriver* driver) override = 0;
 
-        virtual void SwapBuffers() = 0;
+        // Swap internal image buffers for this target, and return the new index
+        virtual u32 SwapBuffers(const u32& frame_index) = 0;
 
         [[nodiscard]] virtual u32 GetWidth() const = 0;
         [[nodiscard]] virtual u32 GetHeight() const = 0;

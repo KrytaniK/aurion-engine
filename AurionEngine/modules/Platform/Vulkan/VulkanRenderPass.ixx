@@ -25,10 +25,6 @@ export namespace Aurion::Vulkan
             // Pipeline names
             std::vector<std::string> pipelines;
 
-            // Queue/Command Buffer Selection
-            const u32 queue_index = 0; // The preferred queue for rendering.
-            const u32 command_buffer_index = 0; // The index of the preferred command buffer
-
             RenderPassExecFn OnExecute = nullptr; // The execution function for this render pass
         };
 

@@ -16,6 +16,11 @@ export namespace Aurion::Vulkan
         struct Config : Aurion::Texture::Config
         {
             vk::ImageCreateInfo image = vk::ImageCreateInfo{}
+                .setImageType(vk::ImageType::e2D)
+                .setExtent(vk::Extent3D(0, 0, 1))
+                .setMipLevels(1)
+                .setArrayLayers(1)
+                .setTiling(vk::ImageTiling::eOptimal)
                 .setFormat(vk::Format::eB8G8R8A8Srgb)
                 .setUsage(vk::ImageUsageFlagBits::eColorAttachment)
                 .setSharingMode(vk::SharingMode::eExclusive);
@@ -48,6 +53,7 @@ export namespace Aurion::Vulkan
         [[nodiscard]] u32 GetWidth() const override;
         [[nodiscard]] u32 GetHeight() const override;
 
+        [[nodiscard]] const vk::raii::Image& GetImage() const;
         [[nodiscard]] const vk::raii::ImageView& GetView() const;
 
         [[nodiscard]] vk::Format GetFormat() const;

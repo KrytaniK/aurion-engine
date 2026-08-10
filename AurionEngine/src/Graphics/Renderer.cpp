@@ -1,17 +1,23 @@
 module;
 
 #include <AurionLog.h>
+#include <memory>
 #include <stdexcept>
 
 module Aurion.Graphics;
 
 namespace Aurion
 {
-    Renderer::~Renderer()
+    Renderer::~Renderer() = default;
+
+    std::shared_ptr<IWindowDriver> Renderer::GetWindowDriver() const
     {
-        // Explicitly destroy the window/graphics API objects
-        m_window_driver.reset(nullptr);
-        m_graphics_driver.reset(nullptr);
+        return m_window_driver;
+    }
+
+    std::shared_ptr<IGraphicsDriver> Renderer::GetGraphicsDriver() const
+    {
+        return m_graphics_driver;
     }
 
     WindowHandle Renderer::OpenWindow(const WindowProperties& properties)
@@ -33,14 +39,12 @@ namespace Aurion
         m_window_driver->CloseWindow(window_id);
     }
 
-    void Renderer::DrawFrame() const
+    void Renderer::DrawFrame(const RenderGraph* graph) const
     {
         if (!m_graphics_driver)
             throw std::runtime_error("[Renderer] Failed to draw frame: No Graphics API specified!");
 
-        m_graphics_driver->BeginFrame();
-        m_graphics_driver->RecordCommands();
-        m_graphics_driver->EndFrame();
+        m_graphics_driver->DrawFrame(graph);
     }
 
     ResourceHandle<Buffer> Renderer::CreateBuffer(const std::string_view& id) const

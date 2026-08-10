@@ -31,27 +31,35 @@ export namespace Aurion::Vulkan
         [[nodiscard]] virtual vk::MemoryRequirements GetMemoryRequirements() const = 0;
         virtual void BindDeviceMemory(std::shared_ptr<vk::raii::DeviceMemory>& memory, const u32& offset, const u32& index) const = 0;
 
+        [[nodiscard]] virtual const vk::Image& GetImage(const u32& index) const = 0;
         [[nodiscard]] virtual const vk::raii::ImageView& GetView(const u32& index) const = 0;
 
         [[nodiscard]] virtual vk::Format GetFormat() const = 0;
 
-        virtual void SwapBuffers(u32& index) = 0;
+        [[nodiscard]] virtual const vk::raii::Semaphore* GetWaitSemaphore(const u32& index) const = 0;
+        [[nodiscard]] virtual const vk::raii::Semaphore* GetSignalSemaphore(const u32& index) const = 0;
+
+        virtual void SwapBuffers(const u32& frame_index, u32& image_index) = 0;
+
+        [[nodiscard]] virtual bool CanPresent() const = 0;
+
+        virtual void Present(const vk::raii::Queue& queue, const u32& buffer_index) = 0;
     };
 
     class RenderTarget : public Aurion::RenderTarget
     {
         enum Type { Default = 0, Swapchain };
 
-    public:
-        struct _Config : Aurion::RenderTarget::Config
+        struct ConfigBase : Aurion::RenderTarget::Config
         {
-            explicit _Config(const Type& type) : Aurion::RenderTarget::Config(), rtType(type) {};
+            explicit ConfigBase(const Type& type) : Aurion::RenderTarget::Config(), rtType(type) {};
             Type rtType = Default;
         };
 
-        struct SwapchainConfig : RenderTarget::_Config
+    public:
+        struct SwapchainConfig : RenderTarget::ConfigBase
         {
-            SwapchainConfig() : RenderTarget::_Config(Swapchain) {};
+            SwapchainConfig() : RenderTarget::ConfigBase(Swapchain) {};
 
             Window* window = nullptr;
             vk::Format format = vk::Format::eUndefined;
@@ -72,38 +80,22 @@ export namespace Aurion::Vulkan
             bool clipped = true;
         };
 
-        struct Config : RenderTarget::_Config
+        struct Config : RenderTarget::ConfigBase
         {
-            Config() : RenderTarget::_Config(Default) {};
+            Config() : RenderTarget::ConfigBase(Default) {};
 
-            u32 width = 0;
-            u32 height = 0;
-            u32 depth = 0;
-            vk::ImageCreateInfo image = vk::ImageCreateInfo{}
-            .setFormat(vk::Format::eB8G8R8A8Srgb)
-            .setUsage(vk::ImageUsageFlagBits::eColorAttachment)
-            .setSharingMode(vk::SharingMode::eExclusive);
-            vk::ImageLayout image_finalLayout = vk::ImageLayout::eReadOnlyOptimal;
-
-            vk::ImageViewCreateInfo view = vk::ImageViewCreateInfo{}
-            .setViewType(vk::ImageViewType::e2D)
-            .setSubresourceRange({ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 })
-            .setComponents({
-                vk::ComponentSwizzle::eIdentity,
-                vk::ComponentSwizzle::eIdentity,
-                vk::ComponentSwizzle::eIdentity,
-                vk::ComponentSwizzle::eIdentity,
-            });
+            Vulkan::Texture::Config texture;
         };
 
     public:
         explicit RenderTarget(const std::string_view& id);
-        ~RenderTarget() override = default;
+        ~RenderTarget() override;
 
         void Configure(const GraphicsResource::Config* properties) override;
         void Attach(const IGraphicsDriver* driver) override;
 
-        void SwapBuffers() override;
+        // Swap internal image buffers for this target, and return the new index
+        u32 SwapBuffers(const u32& frame_index) override;
 
         [[nodiscard]] u32 GetWidth() const override;
         [[nodiscard]] u32 GetHeight() const override;
@@ -112,11 +104,19 @@ export namespace Aurion::Vulkan
         [[nodiscard]] vk::MemoryRequirements GetMemoryRequirements() const;
         void BindDeviceMemory(std::shared_ptr<vk::raii::DeviceMemory>& memory, const u32& offset, const u32& index = 0) const;
 
+        [[nodiscard]] const vk::Image& GetImage() const;
         [[nodiscard]] const vk::raii::ImageView& GetView() const;
 
         [[nodiscard]] vk::Format GetFormat() const;
 
-    protected:
+        [[nodiscard]] const vk::raii::Semaphore* GetWaitSemaphore(const u32& index) const;
+        [[nodiscard]] const vk::raii::Semaphore* GetSignalSemaphore(const u32& index) const;
+
+        [[nodiscard]] bool CanPresent() const;
+
+        void Present(const vk::raii::Queue& queue) const;
+
+    protected: // Methods
         bool OnLoad() override;
         bool OnUnload() override;
 
@@ -130,7 +130,7 @@ export namespace Aurion::Vulkan
     {
     public:
         RenderTargetImpl_Swapchain();
-        ~RenderTargetImpl_Swapchain() override = default;
+        ~RenderTargetImpl_Swapchain() override;
 
         void Configure(const Driver* driver, const GraphicsResource::Config* properties) override;
 
@@ -141,11 +141,22 @@ export namespace Aurion::Vulkan
         [[nodiscard]] vk::MemoryRequirements GetMemoryRequirements() const override;
         void BindDeviceMemory(std::shared_ptr<vk::raii::DeviceMemory>& memory, const u32& offset, const u32& index) const override;
 
+        [[nodiscard]] const vk::Image& GetImage(const u32& index) const override;
         [[nodiscard]] const vk::raii::ImageView& GetView(const u32& index) const override;
 
         [[nodiscard]] vk::Format GetFormat() const override;
 
-        void SwapBuffers(u32& index) override;
+        [[nodiscard]] const vk::raii::Semaphore* GetWaitSemaphore(const u32& index) const override;
+        [[nodiscard]] const vk::raii::Semaphore* GetSignalSemaphore(const u32& index) const override;
+
+        void SwapBuffers(const u32& frame_index, u32& image_index) override;
+
+        [[nodiscard]] bool CanPresent() const override;
+
+        void Present(const vk::raii::Queue& queue, const u32& buffer_index) override;
+
+    private:
+        void RecreateSwapchain();
 
     private:
         RenderTarget::SwapchainConfig m_config;
@@ -155,6 +166,9 @@ export namespace Aurion::Vulkan
         vk::raii::SwapchainKHR m_swapchain;
         std::vector<vk::Image> m_images;
         std::vector<vk::raii::ImageView> m_views;
+        std::vector<vk::raii::Semaphore> m_wait_semaphores;
+        std::vector<vk::raii::Semaphore> m_signal_semaphores;
+        const vk::raii::Queue* m_present_queue;
     };
 
     class RenderTargetImpl_Default : public IRenderTargetImpl
@@ -172,11 +186,19 @@ export namespace Aurion::Vulkan
         [[nodiscard]] vk::MemoryRequirements GetMemoryRequirements() const override;
         void BindDeviceMemory(std::shared_ptr<vk::raii::DeviceMemory>& memory, const u32& offset, const u32& index) const override;
 
+        [[nodiscard]] const vk::Image& GetImage(const u32& index) const override;
         [[nodiscard]] const vk::raii::ImageView& GetView(const u32& index) const override;
 
         [[nodiscard]] vk::Format GetFormat() const override;
 
-        void SwapBuffers(u32& index) override;
+        [[nodiscard]] const vk::raii::Semaphore* GetWaitSemaphore(const u32& index) const override;
+        [[nodiscard]] const vk::raii::Semaphore* GetSignalSemaphore(const u32& index) const override;
+
+        void SwapBuffers(const u32& frame_index, u32& image_index) override;
+
+        [[nodiscard]] bool CanPresent() const override;
+
+        void Present(const vk::raii::Queue& queue, const u32& buffer_index) override;
 
     private:
         RenderTarget::Config m_config;
