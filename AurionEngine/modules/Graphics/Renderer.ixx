@@ -32,7 +32,7 @@ export namespace Aurion
         void CloseWindow(const u64& window_id);
 
         // Render a single frame
-        void DrawFrame(const RenderGraph* graph) const;
+        void DrawFrame(const RenderGraph::CompilationResult& graph) const;
 
         // Creates a blank buffer
         [[nodiscard]] ResourceHandle<Buffer> CreateBuffer(const std::string_view& id) const;

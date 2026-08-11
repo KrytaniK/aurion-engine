@@ -1,6 +1,8 @@
 module;
 
 #include <string>
+#include <vector>
+#include <memory>
 
 export module Aurion.Graphics:RenderGraph;
 
@@ -16,6 +18,14 @@ export namespace Aurion
     class RenderGraph
     {
     public:
+        struct CompilationResult
+        {
+            ResourceHandle<RenderTarget> export_target;
+            std::vector<std::shared_ptr<RenderPass>> passes;
+            std::vector<u64> execution_order;
+        };
+
+    public:
         explicit RenderGraph() = default;
         virtual ~RenderGraph() = default;
 
@@ -30,15 +40,15 @@ export namespace Aurion
         virtual const ResourceHandle<RenderTarget>& CreateRenderTarget(const RenderTarget::Config* desc) = 0;
 
         // Adds a render pass description (node) to this graph
-        virtual void AddPass(const RenderPass::Config* desc) = 0;
+        virtual void AddPass(const RenderPass* desc) = 0;
 
         // Resolves resource dependencies and determines final pass execution order.
-        virtual void Compile() = 0;
+        [[nodiscard]] virtual CompilationResult Compile() = 0;
 
         // Binds this render graph to a transient/registered render target
         //  for presenting/copying
         virtual void Export(const std::string& render_target, const u32& version) = 0;
 
-        virtual const ResourceHandle<RenderTarget>& GetExportTarget() const = 0;
+        [[nodiscard]] virtual const ResourceHandle<RenderTarget>& GetExportTarget() const = 0;
     };
 }

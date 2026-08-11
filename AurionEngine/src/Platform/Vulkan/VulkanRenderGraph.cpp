@@ -70,13 +70,18 @@ namespace Aurion::Vulkan
         return m_render_targets.back();
     }
 
-    void RenderGraph::AddPass(const Aurion::RenderPass::Config* desc)
+    void RenderGraph::AddPass(const Aurion::RenderPass* desc)
     {
-        m_pass_descriptions.push_back(desc);
+        const auto vk_pass = static_cast<const Vulkan::RenderPass*>(desc);
+
+        // Copy pass description
+        m_pass_descriptions.push_back(std::make_shared<Vulkan::RenderPass>(*vk_pass));
     }
 
-    void RenderGraph::Compile()
+    Aurion::RenderGraph::CompilationResult RenderGraph::Compile()
     {
+        Aurion::RenderGraph::CompilationResult result{};
+
         // First, build the dependency graph, cache for recompilation
         m_dependency_graph = BuildDependencyGraph();
 
@@ -84,14 +89,20 @@ namespace Aurion::Vulkan
         auto cull_mask = CullPasses();
 
         // Then determine the pass execution order
-        auto exec_order = TopologicallySortPasses(cull_mask);
-
-        AURION_TRACE("[Render Graph] Execution Order:");
-        for (auto i : exec_order)
-            AURION_TRACE("Pass %d: %s", i, m_pass_descriptions[i]->name.c_str());
+        result.execution_order = TopologicallySortPasses(cull_mask);
 
         // Alias resources against the pass execution order
-        AliasResources(exec_order);
+        AliasResources(result.execution_order);
+
+        // Copy export target
+        result.export_target = m_export_target;
+
+        // And promote pass descriptions
+        result.passes.reserve(m_pass_descriptions.size());
+        for (const auto& pass : m_pass_descriptions)
+            result.passes.push_back(pass);
+
+        return std::move(result);
     }
 
     void RenderGraph::Export(const std::string& render_target, const u32& version)
@@ -127,7 +138,7 @@ namespace Aurion::Vulkan
     {
         std::vector<std::vector<u64>> dep_graph(m_pass_descriptions.size());
 
-        std::unordered_map<Aurion::RenderPass::ResourceRef, u64> writes{};
+        std::unordered_map<Aurion::RenderPassResource, u64> writes{};
 
         // Figure out which buffers are imported. Only transient buffers will have cached configs
         std::vector<u8> imported_mask(m_buffers.size(), 1);
@@ -267,7 +278,7 @@ namespace Aurion::Vulkan
         std::vector<std::pair<u64, u64>> buffer_lifetimes(m_buffer_configs.size(), { UINT64_MAX, UINT64_MAX });
         std::vector<std::pair<u64, u64>> rt_lifetimes(m_render_target_configs.size(), { UINT64_MAX, UINT64_MAX });
 
-        auto determine_lifetime = [&](const u64& idx, const Aurion::RenderPass::ResourceRef& ref)
+        auto determine_lifetime = [&](const u64& idx, const Aurion::RenderPassResource& ref)
         {
             // Check against all buffer configs
             for (u64 j = 0; j < m_buffer_configs.size(); ++j)

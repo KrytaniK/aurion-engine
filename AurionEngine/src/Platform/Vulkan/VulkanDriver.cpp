@@ -175,9 +175,9 @@ namespace Aurion::Vulkan
         m_logical_device.waitIdle();
     }
 
-    void Driver::DrawFrame(const Aurion::RenderGraph* graph)
+    void Driver::DrawFrame(const RenderGraph::CompilationResult& graph)
     {
-        auto* rt = graph->GetExportTarget().As<Vulkan::RenderTarget>();
+        const auto rt = graph.export_target.As<Vulkan::RenderTarget>();
 
         // -----------------------------
         // ----- Frame Preparation -----
@@ -212,64 +212,8 @@ namespace Aurion::Vulkan
 
         graphics_cmd_buffer.begin({});
 
-        // TEMP! Pipeline barrier for swapchain images
-
-        /*void transition_image_layout(
-              uint32_t                imageIndex,
-              vk::ImageLayout         old_layout,
-              vk::ImageLayout         new_layout,
-              vk::AccessFlags2        src_access_mask,
-              vk::AccessFlags2        dst_access_mask,
-              vk::PipelineStageFlags2 src_stage_mask,
-              vk::PipelineStageFlags2 dst_stage_mask
-        )*/
-
-        vk::ImageSubresourceRange sr_range;
-        sr_range.aspectMask= vk::ImageAspectFlagBits::eColor;
-        sr_range.baseMipLevel = 0;
-        sr_range.levelCount = 1;
-        sr_range.baseArrayLayer = 0;
-        sr_range.layerCount = 1;
-
-        vk::ImageMemoryBarrier2 barrier{};
-        barrier.srcAccessMask = {};
-        barrier.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
-        barrier.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        barrier.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        barrier.oldLayout = vk::ImageLayout::eUndefined;
-        barrier.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = rt->GetImage();
-        barrier.subresourceRange = sr_range;
-
-        vk::DependencyInfo dep_info{};
-        dep_info.imageMemoryBarrierCount = 1;
-        dep_info.pImageMemoryBarriers = &barrier;
-
-        graphics_cmd_buffer.pipelineBarrier2(dep_info);
-
-        // TEMP! Pipeline barrier for swapchain images
-
-        // TEMP! Pipeline barrier for swapchain images
-
-        barrier.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
-        barrier.dstAccessMask = {};
-        barrier.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        barrier.dstStageMask = vk::PipelineStageFlagBits2::eBottomOfPipe;
-        barrier.oldLayout = vk::ImageLayout::eColorAttachmentOptimal;
-        barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = rt->GetImage();
-        barrier.subresourceRange = sr_range;
-
-        dep_info.imageMemoryBarrierCount = 1;
-        dep_info.pImageMemoryBarriers = &barrier;
-
-        graphics_cmd_buffer.pipelineBarrier2(dep_info);
-
-        // TEMP! Pipeline barrier for swapchain images
+        for (const auto& idx : graph.execution_order)
+            static_cast<Vulkan::RenderPass*>(graph.passes[idx].get())->OnExecute(graphics_cmd_buffer);
 
         graphics_cmd_buffer.end();
 

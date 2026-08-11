@@ -54,10 +54,6 @@ export namespace Aurion
         T& operator*() const { return *Get(); }
         explicit operator bool() const { return IsValid(); }
 
-        // Conversion Operators
-        template<typename U>
-        operator ResourceHandle<U>() const;
-
     private:
         Resource* m_resource;
         ResourceManager* m_resource_manager;
@@ -249,17 +245,6 @@ export namespace Aurion
     bool ResourceHandle<T>::IsValid() const
     {
         return m_resource != nullptr;
-    }
-
-    template <typename T>
-    template <typename U>
-    ResourceHandle<T>::operator ResourceHandle<U>() const
-    {
-        static_assert(std::is_base_of_v<value_type, U>, "T must derive from U");
-
-        if (!m_resource || !m_resource_manager) return ResourceHandle<U>();
-
-        return ResourceHandle<U>(m_resource->GetId(), m_resource_manager);
     }
 
     template <typename T>

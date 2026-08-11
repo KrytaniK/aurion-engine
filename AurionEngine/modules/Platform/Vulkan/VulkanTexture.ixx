@@ -24,7 +24,7 @@ export namespace Aurion::Vulkan
                 .setFormat(vk::Format::eB8G8R8A8Srgb)
                 .setUsage(vk::ImageUsageFlagBits::eColorAttachment)
                 .setSharingMode(vk::SharingMode::eExclusive);
-                vk::ImageLayout image_finalLayout = vk::ImageLayout::eReadOnlyOptimal;
+            vk::ImageLayout image_finalLayout = vk::ImageLayout::eReadOnlyOptimal;
 
             vk::ImageViewCreateInfo view = vk::ImageViewCreateInfo{}
             .setViewType(vk::ImageViewType::e2D)

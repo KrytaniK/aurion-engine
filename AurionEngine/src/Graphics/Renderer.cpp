@@ -39,7 +39,7 @@ namespace Aurion
         m_window_driver->CloseWindow(window_id);
     }
 
-    void Renderer::DrawFrame(const RenderGraph* graph) const
+    void Renderer::DrawFrame(const RenderGraph::CompilationResult&  graph) const
     {
         if (!m_graphics_driver)
             throw std::runtime_error("[Renderer] Failed to draw frame: No Graphics API specified!");

@@ -17,6 +17,7 @@ import Aurion.Types;
 
 import :Buffer;
 import :RenderTarget;
+import :RenderPass;
 
 export namespace Aurion::Vulkan
 {
@@ -41,15 +42,15 @@ export namespace Aurion::Vulkan
         const ResourceHandle<Aurion::Buffer>& CreateBuffer(const Aurion::Buffer::Config* desc) override;
         const ResourceHandle<Aurion::RenderTarget>& CreateRenderTarget(const Aurion::RenderTarget::Config* desc) override;
 
-        void AddPass(const RenderPass::Config* desc) override;
+        void AddPass(const Aurion::RenderPass* desc) override;
 
-        // Builds the execution sequence for supplied render passes based on resource requirements.
-        void Compile() override;
+        // Builds the execution sequence for supplied render passes based on resource requirements and export target.
+        [[nodiscard]] CompilationResult Compile() override;
 
         // Specifies which render target this graph should export
         void Export(const std::string& render_target, const u32& version) override;
 
-        const ResourceHandle<Aurion::RenderTarget>& GetExportTarget() const override;
+        [[nodiscard]] const ResourceHandle<Aurion::RenderTarget>& GetExportTarget() const override;
 
     private:
         // Builds a dependency graph (as a DAG) from imported/transient resources and pass descriptions
@@ -66,12 +67,12 @@ export namespace Aurion::Vulkan
     private:
         std::shared_ptr<Driver> m_driver;
         std::vector<std::vector<u64>> m_dependency_graph;
-        Aurion::RenderPass::ResourceRef m_export_target_ref;
+        Aurion::RenderPassResource m_export_target_ref;
         ResourceHandle<Aurion::RenderTarget> m_export_target; //
         std::vector<ResourceHandle<Aurion::Buffer>> m_buffers;
         std::vector<ResourceHandle<Aurion::RenderTarget>> m_render_targets;
         std::vector<ResourceConfig<Vulkan::Buffer>> m_buffer_configs; //
         std::vector<ResourceConfig<Vulkan::RenderTarget>> m_render_target_configs; //
-        std::vector<const Aurion::RenderPass::Config*> m_pass_descriptions; //
+        std::vector<std::shared_ptr<Vulkan::RenderPass>> m_pass_descriptions; //
     };
 }

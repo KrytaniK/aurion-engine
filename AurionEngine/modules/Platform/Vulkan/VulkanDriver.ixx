@@ -28,7 +28,7 @@ export namespace Aurion::Vulkan
         explicit Driver(const DriverConfig& config);
         ~Driver() override;
 
-        void DrawFrame(const RenderGraph* graph) override;
+        void DrawFrame(const Aurion::RenderGraph::CompilationResult& graph) override;
 
         // Resource Creation
         // -----------------------------------------------------
