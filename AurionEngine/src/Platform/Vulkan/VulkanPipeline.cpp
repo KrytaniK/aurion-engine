@@ -28,7 +28,7 @@ namespace Aurion::Vulkan
         m_config = *dynamic_cast<const Config*>(properties);
 
         // Build and assign layout
-        m_layout = m_driver->BuildPipelineLayout(m_config.layout_info);
+        m_layout = m_driver->BuildGraphicsPipelineLayout(m_config);
         m_config.layout = m_layout;
 
         // Build graphics pipeline

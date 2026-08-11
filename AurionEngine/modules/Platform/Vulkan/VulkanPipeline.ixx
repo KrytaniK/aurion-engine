@@ -36,6 +36,7 @@ export namespace Aurion::Vulkan
         void Attach(const IGraphicsDriver* driver) override = 0;
 
         vk::raii::Pipeline& Get() { return m_pipeline; };
+        vk::raii::PipelineLayout& GetLayout() { return m_layout; };
 
     protected:
         bool OnLoad() override = 0;

@@ -340,6 +340,19 @@ namespace Aurion::Vulkan
         return handle;
     }
 
+    ResourceHandle<Vulkan::DescriptorPool> Driver::CreateDescriptorPool(const std::string_view& id) const
+    {
+        auto handle = m_resource_manager->Load<Vulkan::DescriptorPool>(id);
+
+        // If the handle is invalid, simply return it. This should only happen when
+        //  resource creation failed.
+        if (!handle.IsValid()) return handle;
+
+        handle->Attach(this);
+
+        return handle;
+    }
+
     vk::raii::Semaphore Driver::CreateSemaphore(const vk::SemaphoreCreateInfo& info) const
     {
         return vk::raii::Semaphore(m_logical_device, info);
@@ -395,6 +408,22 @@ namespace Aurion::Vulkan
     {
         config.image = image;
         return vk::raii::ImageView(m_logical_device, config);
+    }
+
+    std::vector<vk::raii::DescriptorSet> Driver::AllocateDescriptorSets(const vk::raii::DescriptorPool& pool,
+        const u32& count, const vk::DescriptorSetLayout* layouts) const
+    {
+        vk::DescriptorSetAllocateInfo alloc_info{};
+        alloc_info.descriptorPool = *pool;
+        alloc_info.descriptorSetCount = count;
+        alloc_info.pSetLayouts = layouts;
+
+        return m_logical_device.allocateDescriptorSets(alloc_info);
+    }
+
+    void Driver::UpdateDescriptorSets(std::span<vk::WriteDescriptorSet> writes) const
+    {
+        m_logical_device.updateDescriptorSets(writes, {});
     }
 
     // Memory Binding
@@ -575,9 +604,52 @@ namespace Aurion::Vulkan
         return module;
     }
 
-    vk::raii::PipelineLayout Driver::BuildPipelineLayout(const vk::PipelineLayoutCreateInfo& info) const
+    vk::raii::DescriptorPool Driver::AllocateDescriptorPool(const Vulkan::DescriptorPool::Config& config) const
     {
-        return vk::raii::PipelineLayout(m_logical_device, info);
+        vk::DescriptorPoolCreateInfo cInfo{};
+        cInfo.flags = config.flags;
+        cInfo.maxSets = config.max_sets;
+        cInfo.poolSizeCount = static_cast<u32>(config.pool_sizes.size());
+        cInfo.pPoolSizes = config.pool_sizes.data();
+
+        return vk::raii::DescriptorPool(m_logical_device, cInfo);
+    }
+
+    vk::raii::DescriptorSetLayout Driver::AllocateDescriptorSetLayout(
+        const std::span<vk::DescriptorSetLayoutBinding> bindings) const
+    {
+        vk::DescriptorSetLayoutCreateInfo c_info{};
+        c_info.bindingCount = static_cast<u32>(bindings.size());
+        c_info.pBindings = bindings.data();
+
+        return vk::raii::DescriptorSetLayout(m_logical_device, c_info);
+    }
+
+    vk::raii::PipelineLayout Driver::BuildGraphicsPipelineLayout(const Vulkan::GraphicsPipeline::Config& config) const
+    {
+        // Retrieve vertex input and descriptor set layout information from shaders
+        std::vector<ResourceHandle<Aurion::Shader>> shaders;
+        shaders.reserve(config.shaders.size());
+        for (const auto& name : config.shaders)
+            shaders.push_back(m_resource_manager->Load<Aurion::Shader, Vulkan::Shader>(name));
+
+        Vulkan::Shader* shader = nullptr;
+        std::vector<vk::DescriptorSetLayout> set_layouts{};
+        set_layouts.reserve(config.shaders.size());
+        for (const auto& handle : shaders)
+        {
+            shader = handle.As<Vulkan::Shader>();
+            set_layouts.push_back(*shader->GetDescriptorSetLayout());
+        }
+
+        // Copy config's layout create information
+        vk::PipelineLayoutCreateInfo c_info = config.layout_info;
+
+        // and apply descriptor set layouts
+        c_info.setLayoutCount = static_cast<u32>(set_layouts.size());
+        c_info.pSetLayouts = set_layouts.data();
+
+        return vk::raii::PipelineLayout(m_logical_device, c_info);
     }
 
     vk::raii::Pipeline Driver::BuildGraphicsPipeline(const Vulkan::GraphicsPipeline::Config& config) const
@@ -585,6 +657,7 @@ namespace Aurion::Vulkan
         std::vector<ResourceHandle<Aurion::Shader>> shader_handles;
 
         // Retrieve handles to all shaders
+        shader_handles.reserve(config.shaders.size());
         for (const auto& name : config.shaders)
         {
             auto handle = m_resource_manager->Load<Aurion::Shader, Vulkan::Shader>(name);
@@ -597,7 +670,7 @@ namespace Aurion::Vulkan
         for (auto& handle : shader_handles)
         {
             // Cast to Vulkan shader
-            Vulkan::Shader* shader = dynamic_cast<Vulkan::Shader*>(handle.Get());
+            Vulkan::Shader* shader = handle.As<Vulkan::Shader>();
 
             for (const auto& entry : shader->GetEntryPoints())
             {
@@ -625,6 +698,11 @@ namespace Aurion::Vulkan
 
         // Create the pipeline
         return vk::raii::Pipeline(m_logical_device, nullptr, cInfo, config.alloc_callbacks);
+    }
+
+    void Driver::WaitIdle() const
+    {
+        m_logical_device.waitIdle();
     }
 
     vk::ShaderStageFlagBits Driver::GetVulkanPipelineStage(const Aurion::Shader::Stage& stage) const

@@ -17,7 +17,7 @@ namespace Aurion::Vulkan
 
     RenderTarget::~RenderTarget()
     {
-
+        m_driver->WaitIdle(); // Let all GPU work finish before destruction
     }
 
     void RenderTarget::Configure(const GraphicsResource::Config* properties)
@@ -131,6 +131,11 @@ namespace Aurion::Vulkan
 
     }
 
+    RenderTargetImpl_Default::~RenderTargetImpl_Default()
+    {
+        m_driver->WaitIdle(); // Let all GPU work finish before destruction
+    }
+
     void RenderTargetImpl_Default::Configure(const Driver* driver, const GraphicsResource::Config* properties)
     {
         m_driver = driver;
@@ -233,10 +238,7 @@ namespace Aurion::Vulkan
 
     RenderTargetImpl_Swapchain::~RenderTargetImpl_Swapchain()
     {
-        // If work was ever submitted for presentation, we need to wait
-        //  for that work to finish before cleaning up any sync objects
-        if (m_present_queue)
-            m_present_queue->waitIdle();
+        m_driver->WaitIdle(); // Let all GPU work finish before destruction
     }
 
     void RenderTargetImpl_Swapchain::Configure(const Driver* driver, const GraphicsResource::Config* properties)
@@ -354,9 +356,6 @@ namespace Aurion::Vulkan
 
     void RenderTargetImpl_Swapchain::Present(const vk::raii::Queue& queue, const u32& buffer_index)
     {
-        // Store a ref to the queue for resource cleanup
-        m_present_queue = &queue;
-
         vk::PresentInfoKHR present_info;
         present_info.waitSemaphoreCount = 1;
         present_info.pWaitSemaphores = &*m_signal_semaphores[buffer_index];

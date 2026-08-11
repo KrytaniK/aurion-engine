@@ -22,7 +22,8 @@ import Aurion.Types;
 namespace Aurion::Vulkan
 {
     Shader::Shader(const std::string_view& id)
-        : Aurion::Shader(id), m_driver(nullptr), m_file_handle(nullptr)
+        : Aurion::Shader(id), m_driver(nullptr), m_file_handle(nullptr),
+            m_desc_set_layout(nullptr)
     {}
 
     Shader::~Shader()
@@ -81,6 +82,9 @@ namespace Aurion::Vulkan
                 m_driver->CreateShaderModule(m_config.path, buffer, m_config.lang, entry, m_config.defines)
             );
         }
+
+        // Then, the descriptor set layout needs to be created
+        m_desc_set_layout = m_driver->AllocateDescriptorSetLayout(m_config.descriptor_bindings);
     }
 
     void Shader::Attach(const IGraphicsDriver* driver)
@@ -99,6 +103,21 @@ namespace Aurion::Vulkan
             return nullptr;
 
         return &m_modules.at(entry.stage);
+    }
+
+    std::span<vk::VertexInputBindingDescription> Shader::GetVertexBindingDescriptions()
+    {
+        return m_config.vertex_bindings;
+    }
+
+    std::span<vk::VertexInputAttributeDescription> Shader::GetVertexAttributeDescriptions()
+    {
+        return m_config.vertex_attributes;
+    }
+
+    const vk::raii::DescriptorSetLayout& Shader::GetDescriptorSetLayout()
+    {
+        return m_desc_set_layout;
     }
 
     bool Shader::OnLoad()

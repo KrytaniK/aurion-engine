@@ -14,6 +14,11 @@ namespace Aurion::Vulkan
 
     }
 
+    Buffer::~Buffer()
+    {
+        m_driver->WaitIdle();
+    }
+
     void Buffer::Configure(const GraphicsResource::Config* properties)
     {
         // Save local configuration

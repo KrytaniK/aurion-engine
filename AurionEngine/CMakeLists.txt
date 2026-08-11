@@ -36,7 +36,14 @@ FetchContent_Declare(
         GIT_TAG main # Always fetch latest
 )
 
+FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG 0af55ccecd98d4e5a8d1fad7de25ba429d60e863
+)
+
 FetchContent_MakeAvailable(aurion-core)
+FetchContent_MakeAvailable(glm)
 
 # Vulkan
 find_package(slang CONFIG HINTS "$ENV{VULKAN_SDK}/lib/cmake")
@@ -50,6 +57,7 @@ target_link_libraries(aurion-engine PRIVATE glfw)
 target_link_libraries(aurion-engine PRIVATE aurion-core)
 target_link_libraries(aurion-engine PRIVATE ${Vulkan_LIBRARIES})
 target_link_libraries(aurion-engine PRIVATE shaderc_combined glslang SPIRV SPIRV-Tools SPIRV-Tools-opt)
+target_link_libraries(aurion-engine PRIVATE glm::glm)
 
 # Setting up build targets for find_package() support
 include(GNUInstallDirs)
@@ -61,6 +69,18 @@ install(TARGETS aurion-engine
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         FILE_SET CXX_MODULES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Aurion/modules
+)
+
+# glm only registers its own export set when built as the top-level project
+# (GLM_BUILD_INSTALL defaults to off for FetchContent in subprojects), so it
+# never lands in an export set on its own. Since aurion-engine is STATIC,
+# even its PRIVATE link to glm must be resolvable by consumers at link time,
+# so glm's targets need to be exported here too.
+install(TARGETS glm glm-header-only
+        EXPORT aurion-engine-targets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 # Include macro files in the build package
@@ -89,3 +109,4 @@ add_executable(aurion-engine-tests ${TESTSRC})
 target_link_libraries(aurion-engine-tests PRIVATE glfw)
 target_link_libraries(aurion-engine-tests PRIVATE aurion-engine)
 target_link_libraries(aurion-engine-tests PRIVATE aurion-core)
+target_link_libraries(aurion-engine-tests PRIVATE glm::glm)

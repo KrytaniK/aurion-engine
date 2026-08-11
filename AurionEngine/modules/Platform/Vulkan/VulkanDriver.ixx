@@ -20,6 +20,8 @@ import :Texture;
 import :RenderTarget;
 import :Pipeline;
 
+import :DescriptorPool;
+
 export namespace Aurion::Vulkan
 {
     class Driver : public IGraphicsDriver
@@ -48,6 +50,9 @@ export namespace Aurion::Vulkan
         // Creates a blank pipeline, tied to this driver.
         ResourceHandle<Aurion::Pipeline> CreatePipeline(const std::string_view& id, const Pipeline::Type& type) override;
 
+        // Creates a blank descriptor pool, tied to this driver
+        [[nodiscard]] ResourceHandle<Vulkan::DescriptorPool> CreateDescriptorPool(const std::string_view& id) const;
+
         // Synchronization Primitives
 
         [[nodiscard]] vk::raii::Semaphore CreateSemaphore(const vk::SemaphoreCreateInfo& info) const;
@@ -69,6 +74,18 @@ export namespace Aurion::Vulkan
 
         [[nodiscard]] vk::raii::ImageView AllocateImageView(const vk::Image& image, vk::ImageViewCreateInfo& config) const;
 
+        [[nodiscard]] vk::raii::DescriptorPool AllocateDescriptorPool(const Vulkan::DescriptorPool::Config& config) const;
+
+        [[nodiscard]] vk::raii::DescriptorSetLayout AllocateDescriptorSetLayout(std::span<vk::DescriptorSetLayoutBinding> bindings) const;
+
+        [[nodiscard]] std::vector<vk::raii::DescriptorSet> AllocateDescriptorSets(const vk::raii::DescriptorPool& pool, const u32& count, const vk::DescriptorSetLayout* layouts) const;
+
+        // Resource Updates
+
+        void UpdateDescriptorSets(std::span<vk::WriteDescriptorSet> writes) const;
+
+        // Utility
+
         // Ensures the provided surface can be presented to
         void ValidatePresentSupport(const vk::raii::SurfaceKHR& surface) const;
 
@@ -88,8 +105,10 @@ export namespace Aurion::Vulkan
             const std::vector<Shader::Macro>& defines
         ) const;
 
-        [[nodiscard]] vk::raii::PipelineLayout BuildPipelineLayout(const vk::PipelineLayoutCreateInfo& info) const;
+        [[nodiscard]] vk::raii::PipelineLayout BuildGraphicsPipelineLayout(const Vulkan::GraphicsPipeline::Config& config) const;
         [[nodiscard]] vk::raii::Pipeline BuildGraphicsPipeline(const Vulkan::GraphicsPipeline::Config& config) const;
+
+        void WaitIdle() const;
 
     private:
 

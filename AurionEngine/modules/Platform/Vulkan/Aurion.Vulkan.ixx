@@ -14,3 +14,5 @@ export import :Texture;
 export import :RenderTarget;
 export import :Shader;
 export import :Pipeline;
+export import :DescriptorPool;
+export import :DescriptorSet;

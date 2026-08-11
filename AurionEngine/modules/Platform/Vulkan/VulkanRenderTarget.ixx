@@ -175,7 +175,7 @@ export namespace Aurion::Vulkan
     {
     public:
         RenderTargetImpl_Default();
-        ~RenderTargetImpl_Default() override = default;
+        ~RenderTargetImpl_Default() override;
 
         void Configure(const Driver* driver, const GraphicsResource::Config* properties) override;
 
