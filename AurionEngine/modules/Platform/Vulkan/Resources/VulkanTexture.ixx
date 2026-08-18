@@ -44,7 +44,7 @@ export namespace Aurion::Vulkan
         Texture(Texture&& other) noexcept;
         Texture& operator=(Texture&& other) noexcept;
 
-        void Configure(const GraphicsResource::Config* properties) override;
+        void Configure(const GraphicsInterface::Config* properties) override;
         void Attach(const IGraphicsDriver* driver) override;
 
         [[nodiscard]] vk::MemoryRequirements GetMemoryRequirements() const;

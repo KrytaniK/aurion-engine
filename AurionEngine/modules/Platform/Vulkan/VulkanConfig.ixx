@@ -11,11 +11,8 @@ import Aurion.Types;
 
 export namespace Aurion::Vulkan
 {
-    // Optional GPU suitability function for advanced property and feature requirements.
-    typedef std::function<bool(const vk::raii::PhysicalDevice&)> PhysicalDeviceSuitabilityFn;
-
-    // Function pointer to the function used to create a presentable Vulkan Surface
-    typedef std::function<VkSurfaceKHR(const vk::raii::Instance&, Window*)> SurfaceCreateFn;
+    // Optional GPU suitability function for advanced GPU property and feature requirements.
+    typedef std::function<bool(const vk::raii::PhysicalDevice&)> GPUSuitabilityFn;
 
     // Handles basic Vulkan instance configuration
     struct APIConfig
@@ -26,15 +23,6 @@ export namespace Aurion::Vulkan
         bool validation_layers_enabled = false;
     };
 
-    // Describes the desired property requirements for GPU selection
-    struct PhysicalDeviceProperties
-    {
-        u32 min_api_version; // The minimum supported Vulkan API version
-        vk::PhysicalDeviceType type; // The type of device (GPU/Integrated/CPU)
-        vk::Flags<vk::QueueFlagBits> queue_flags; // Bit flags for desired rendering queues (graphics, compute, etc.)
-        const std::vector<const char*>& extensions; // Required device extensions
-    };
-
     // Describes a request for one or more logical device queues
     struct QueueDescription
     {
@@ -43,22 +31,24 @@ export namespace Aurion::Vulkan
         std::vector<float> priorities{};
     };
 
-    // Describes the configuration for a Vulkan Logical Device
-    struct InterfaceConfig
+    // Handles Vulkan Logical Device Configuration
+    struct DeviceProperties
     {
         // A list of queue type preferences, paired with the desired queue creation amount and its priority
         const std::vector<QueueDescription> queues{};
         const std::vector<const char*>& extensions{}; // Required device extensions (if any)
         vk::PhysicalDeviceFeatures2* features = nullptr; // Required device features (if any)
-        u32 max_frames_in_flight = 3; // Triple Buffering by default
+        u32 max_in_flight_frames = 3; // At maximum, triple-buffer frames by default
     };
 
-    // Handles extended Vulkan Driver configurations
-    struct DriverConfig
+    // Describes the desired property requirements for GPU selection
+    struct PhysicalDeviceProperties
     {
-
-        vk::raii::PhysicalDevice physical_device = nullptr; // The GPU to use for Vulkan operations
-        InterfaceConfig interface{};
-        SurfaceCreateFn on_surface_create = nullptr;
+        u32 min_api_version; // The minimum supported Vulkan API version
+        vk::PhysicalDeviceType type; // The type of device (GPU/Integrated/CPU)
+        vk::Flags<vk::QueueFlagBits> queue_flags{}; // Bit flags for desired rendering queues (graphics, compute, etc.)
+        const std::vector<const char*>& extensions{}; // Required device extensions
+        GPUSuitabilityFn gpu_suitability_fn = nullptr;
     };
+
 }

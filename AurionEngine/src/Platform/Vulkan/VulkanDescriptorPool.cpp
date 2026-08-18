@@ -9,7 +9,7 @@ module Aurion.Vulkan;
 namespace Aurion::Vulkan
 {
     DescriptorPool::DescriptorPool(const std::string_view& id)
-        : Aurion::GraphicsResource(id), m_config({}), m_driver(nullptr),
+        : Aurion::GraphicsInterface(id), m_config({}), m_driver(nullptr),
             m_pool(nullptr)
     {
 
@@ -20,7 +20,7 @@ namespace Aurion::Vulkan
 
     }
 
-    void DescriptorPool::Configure(const GraphicsResource::Config* properties)
+    void DescriptorPool::Configure(const GraphicsInterface::Config* properties)
     {
         m_config = *dynamic_cast<const Vulkan::DescriptorPool::Config*>(properties);
 

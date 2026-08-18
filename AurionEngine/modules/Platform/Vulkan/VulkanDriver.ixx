@@ -24,11 +24,20 @@ import :DescriptorPool;
 
 export namespace Aurion::Vulkan
 {
+    class API;
     class Driver : public IGraphicsDriver
     {
     public:
-        explicit Driver(const DriverConfig& config);
+        explicit Driver(const API* vulkan_api, const PhysicalDeviceProperties& pDevice_props, const DeviceProperties& device_props);
         ~Driver() override;
+
+
+
+
+
+
+
+
 
         void DrawFrame(const Aurion::RenderGraph::CompilationResult& graph) override;
 
@@ -106,7 +115,7 @@ export namespace Aurion::Vulkan
         ) const;
 
         [[nodiscard]] vk::raii::PipelineLayout BuildGraphicsPipelineLayout(const Vulkan::GraphicsPipeline::Config& config) const;
-        [[nodiscard]] vk::raii::Pipeline BuildGraphicsPipeline(const Vulkan::GraphicsPipeline::Config& config) const;
+        [[nodiscard]] vk::raii::Pipeline BuildGraphicsPipeline(const Vulkan::GraphicsPipeline::Config& conm_vulkan_apifig) const;
 
         void WaitIdle() const;
 
@@ -116,13 +125,11 @@ export namespace Aurion::Vulkan
         [[nodiscard]] vk::ShaderStageFlagBits GetVulkanPipelineStage(const Aurion::Shader::Stage& stage) const;
 
     private:
-        ResourceManager* m_resource_manager;
-        const vk::raii::Context* m_context;
-        const vk::raii::Instance* m_instance;
+        const API* m_vulkan_api;
         vk::raii::PhysicalDevice m_physical_device;
         vk::raii::Device m_logical_device;
+
         std::unordered_map<u32, QueueFamily> m_queue_families;
-        SurfaceCreateFn m_CreateSurfaceFn;
         std::vector<vk::raii::Fence> m_render_fences;
         u32 m_max_frames_in_flight;
         u32 m_frame_index;

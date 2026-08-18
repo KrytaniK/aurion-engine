@@ -8,12 +8,6 @@ import :Config;
 
 export namespace Aurion::Vulkan
 {
-#ifdef NDEBUG
-    constexpr bool g_vk_validation_layers_enabled = false;
-#else
-    constexpr bool g_vk_validation_layers_enabled = true;
-#endif
-
     const std::vector g_vk_default_validation_layers = {
         "VK_LAYER_KHRONOS_validation",
     };
@@ -21,6 +15,12 @@ export namespace Aurion::Vulkan
     const std::vector g_vk_default_device_extensions = {
         vk::KHRSwapchainExtensionName,
     };
+
+#ifdef NDEBUG
+    constexpr bool g_vk_validation_layers_enabled = false;
+#else
+    constexpr bool g_vk_validation_layers_enabled = true;
+#endif
 
     constexpr vk::DebugUtilsMessageSeverityFlagsEXT g_vk_default_debug_message_severity_flags(
         vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
@@ -36,7 +36,7 @@ export namespace Aurion::Vulkan
         vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding
     );
 
-    constexpr PhysicalDeviceProperties g_vk_default_device_properties{
+    const PhysicalDeviceProperties g_vk_default_device_properties{
         // Target Vulkan 1.4
         .min_api_version = vk::ApiVersion14,
         // Prefer Dedicated GPU
@@ -44,6 +44,6 @@ export namespace Aurion::Vulkan
         // Support Graphics and Compute operations
         .queue_flags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute,
         //
-        .extensions = g_vk_default_device_extensions,
+        .extensions = g_vk_default_device_extensions
     };
 }

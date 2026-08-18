@@ -27,7 +27,7 @@ export namespace Aurion::Vulkan
         explicit Buffer(const std::string_view& id);
         ~Buffer() override;
 
-        void Configure(const GraphicsResource::Config* properties) override ;
+        void Configure(const GraphicsInterface::Config* properties) override ;
         void Attach(const IGraphicsDriver* driver) override;
 
         void Write(void* data, const u32& offset, const u32& size) override;

@@ -1,7 +1,9 @@
 export module Aurion.Graphics;
 
-export import :IGraphicsDriver;
-export import :GraphicsResource;
+export import :Interface;
+export import :Config;
+export import :Types;
+
 export import :RenderGraph;
 export import :RenderPass;
 export import :Renderer;

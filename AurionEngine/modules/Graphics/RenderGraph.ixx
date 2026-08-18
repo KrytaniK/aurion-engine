@@ -18,37 +18,55 @@ export namespace Aurion
     class RenderGraph
     {
     public:
-        struct CompilationResult
-        {
-            ResourceHandle<RenderTarget> export_target;
-            std::vector<std::shared_ptr<RenderPass>> passes;
-            std::vector<u64> execution_order;
-        };
+        explicit RenderGraph();
+        ~RenderGraph();
 
-    public:
-        explicit RenderGraph() = default;
-        virtual ~RenderGraph() = default;
+        // Registers a persistent gpu resource with the graph
+        void RegisterResource(const GPUHandle& handle);
 
-        // External, static resource referencing
+        // Queues the creation for a transient (per-frame) buffer
+        u32 CreateTransientBuffer(const BufferDescription& desc);
 
-        virtual void RegisterBuffer(const ResourceHandle<Buffer>& buffer) = 0;
-        virtual void RegisterRenderTarget(const ResourceHandle<RenderTarget>& render_target) = 0;
+        // Queues the creation for a transient (per-frame) render target
+        u32 CreateTransientRenderTarget(const RenderTargetDescription& desc);
 
-        // Per-Frame, transient resource creation
-
-        virtual const ResourceHandle<Buffer>& CreateBuffer(const Buffer::Config* desc) = 0;
-        virtual const ResourceHandle<RenderTarget>& CreateRenderTarget(const RenderTarget::Config* desc) = 0;
-
-        // Adds a render pass description (node) to this graph
-        virtual void AddPass(const RenderPass* desc) = 0;
-
-        // Resolves resource dependencies and determines final pass execution order.
-        [[nodiscard]] virtual CompilationResult Compile() = 0;
-
-        // Binds this render graph to a transient/registered render target
-        //  for presenting/copying
-        virtual void Export(const std::string& render_target, const u32& version) = 0;
-
-        [[nodiscard]] virtual const ResourceHandle<RenderTarget>& GetExportTarget() const = 0;
+        void AddPass(const RenderPassDescription& desc);
     };
+
+    // class RenderGraph
+    // {
+    // public:
+    //     struct CompilationResult
+    //     {
+    //         ResourceHandle<RenderTarget> export_target;
+    //         std::vector<std::shared_ptr<RenderPass>> passes;
+    //         std::vector<u64> execution_order;
+    //     };
+    //
+    // public:
+    //     explicit RenderGraph() = default;
+    //     virtual ~RenderGraph() = default;
+    //
+    //     // External, static resource referencing
+    //
+    //     virtual void RegisterBuffer(const ResourceHandle<Buffer>& buffer) = 0;
+    //     virtual void RegisterRenderTarget(const ResourceHandle<RenderTarget>& render_target) = 0;
+    //
+    //     // Per-Frame, transient resource creation
+    //
+    //     virtual const ResourceHandle<Buffer>& CreateBuffer(const Buffer::Config* desc) = 0;
+    //     virtual const ResourceHandle<RenderTarget>& CreateRenderTarget(const RenderTarget::Config* desc) = 0;
+    //
+    //     // Adds a render pass description (node) to this graph
+    //     virtual void AddPass(const RenderPass* desc) = 0;
+    //
+    //     // Resolves resource dependencies and determines final pass execution order.
+    //     [[nodiscard]] virtual CompilationResult Compile() = 0;
+    //
+    //     // Binds this render graph to a transient/registered render target
+    //     //  for presenting/copying
+    //     virtual void Export(const std::string& render_target, const u32& version) = 0;
+    //
+    //     [[nodiscard]] virtual const ResourceHandle<RenderTarget>& GetExportTarget() const = 0;
+    // };
 }

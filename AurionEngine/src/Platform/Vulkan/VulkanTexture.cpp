@@ -44,7 +44,7 @@ namespace Aurion::Vulkan
         return *this;
     }
 
-    void Texture::Configure(const GraphicsResource::Config* properties)
+    void Texture::Configure(const GraphicsInterface::Config* properties)
     {
         if (!m_driver) return;
 

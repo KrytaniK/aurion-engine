@@ -26,9 +26,9 @@ namespace Aurion::Vulkan
         return m_instance;
     }
 
-    std::shared_ptr<Vulkan::Driver> API::CreateDriver(const Vulkan::DriverConfig& config)
+    std::shared_ptr<Driver> API::CreateDriver(const PhysicalDeviceProperties& pDeviceProps, const DeviceProperties& device_props) const
     {
-        return std::make_shared<Vulkan::Driver>(config);
+        return std::make_shared<Driver>(this, pDeviceProps, device_props);
     }
 
     void API::ValidateInstanceExtensions() const
@@ -82,9 +82,7 @@ namespace Aurion::Vulkan
         }
     }
 
-    vk::raii::PhysicalDevice API::GetPhysicalDevice(
-        const PhysicalDeviceProperties* prop_reqs,
-        const PhysicalDeviceSuitabilityFn& ext_suitability_fn) const
+    vk::raii::PhysicalDevice API::GetPhysicalDevice(const PhysicalDeviceProperties& props) const
     {
         // Query for available GPUs
         auto pDevices = m_instance.enumeratePhysicalDevices();
@@ -93,9 +91,6 @@ namespace Aurion::Vulkan
             throw std::runtime_error("[Vulkan Driver] No physical device found on this system");
 
         bool meets_basic_reqs = false;
-        // Fallback to default configuration when no arguments are supplied
-        auto required_props = prop_reqs ? prop_reqs : &g_vk_default_device_properties;
-        auto suitability_fn = ext_suitability_fn ? ext_suitability_fn : nullptr;
 
         vk::PhysicalDeviceProperties dProps{};
 
@@ -111,13 +106,13 @@ namespace Aurion::Vulkan
 
             AURION_TRACE("[Vulkan] Device Found: %s", &dProps.deviceName);
 
-            const bool meets_api_version = dProps.apiVersion >= required_props->min_api_version;
-            const bool is_preferred_type = dProps.deviceType == required_props->type;
+            const bool meets_api_version = dProps.apiVersion >= props.min_api_version;
+            const bool is_preferred_type = dProps.deviceType == props.type;
             const bool is_queue_compatible = std::ranges::any_of(queue_families, [&](const auto& qProps)
                 {
-                    return !!(qProps.queueFlags & required_props->queue_flags);
+                    return !!(qProps.queueFlags & props.queue_flags);
                 });
-            const bool has_all_extensions = std::ranges::all_of(required_props->extensions,
+            const bool has_all_extensions = std::ranges::all_of(props.extensions,
                 [&](const auto& required_ext)
                 {
                     return std::ranges::any_of(available_extensions,
@@ -141,7 +136,7 @@ namespace Aurion::Vulkan
                 has_all_extensions;
 
             // NOTE: Device feature compatibility should be checked in the suitability function.
-            return meets_basic_reqs && (suitability_fn ? suitability_fn(device) : true);
+            return meets_basic_reqs && (props.gpu_suitability_fn ? props.gpu_suitability_fn(device) : true);
         });
 
         return it == pDevices.end() ? vk::raii::PhysicalDevice(nullptr) : *it;

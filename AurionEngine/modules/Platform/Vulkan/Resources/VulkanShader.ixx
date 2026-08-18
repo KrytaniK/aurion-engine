@@ -28,7 +28,7 @@ export namespace Aurion::Vulkan
         explicit Shader(const std::string_view& id);
         ~Shader() override;
 
-        void Configure(const GraphicsResource::Config* properties) override;
+        void Configure(const GraphicsInterface::Config* properties) override;
         void Attach(const IGraphicsDriver* driver) override;
 
         [[nodiscard]] const std::vector<EntryPoint>& GetEntryPoints() const;

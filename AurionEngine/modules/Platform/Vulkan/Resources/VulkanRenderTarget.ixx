@@ -22,7 +22,7 @@ export namespace Aurion::Vulkan
     public:
         virtual ~IRenderTargetImpl() = default;
 
-        virtual void Configure(const Driver* driver, const GraphicsResource::Config* properties) = 0;
+        virtual void Configure(const Driver* driver, const GraphicsInterface::Config* properties) = 0;
 
         [[nodiscard]] virtual u32 GetWidth() const = 0;
         [[nodiscard]] virtual u32 GetHeight() const = 0;
@@ -57,10 +57,13 @@ export namespace Aurion::Vulkan
         };
 
     public:
+        using BaseType = Aurion::RenderTarget;
+
         struct SwapchainConfig : RenderTarget::ConfigBase
         {
             SwapchainConfig() : RenderTarget::ConfigBase(Swapchain) {};
 
+            vk::ImageSubresourceRange
             Window* window = nullptr;
             vk::Format format = vk::Format::eUndefined;
             vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
@@ -91,7 +94,7 @@ export namespace Aurion::Vulkan
         explicit RenderTarget(const std::string_view& id);
         ~RenderTarget() override;
 
-        void Configure(const GraphicsResource::Config* properties) override;
+        void Configure(const GraphicsInterface::Config* properties) override;
         void Attach(const IGraphicsDriver* driver) override;
 
         // Swap internal image buffers for this target, and return the new index
@@ -132,7 +135,7 @@ export namespace Aurion::Vulkan
         RenderTargetImpl_Swapchain();
         ~RenderTargetImpl_Swapchain() override;
 
-        void Configure(const Driver* driver, const GraphicsResource::Config* properties) override;
+        void Configure(const Driver* driver, const GraphicsInterface::Config* properties) override;
 
         [[nodiscard]] u32 GetWidth() const override;
         [[nodiscard]] u32 GetHeight() const override;
@@ -177,7 +180,7 @@ export namespace Aurion::Vulkan
         RenderTargetImpl_Default();
         ~RenderTargetImpl_Default() override;
 
-        void Configure(const Driver* driver, const GraphicsResource::Config* properties) override;
+        void Configure(const Driver* driver, const GraphicsInterface::Config* properties) override;
 
         [[nodiscard]] u32 GetWidth() const override;
         [[nodiscard]] u32 GetHeight() const override;

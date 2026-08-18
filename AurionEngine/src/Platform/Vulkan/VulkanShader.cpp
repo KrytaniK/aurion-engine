@@ -31,7 +31,7 @@ namespace Aurion::Vulkan
 
     }
 
-    void Shader::Configure(const GraphicsResource::Config* properties)
+    void Shader::Configure(const GraphicsInterface::Config* properties)
     {
         // Save a local copy of the config
         m_config = *dynamic_cast<const Config*>(properties);

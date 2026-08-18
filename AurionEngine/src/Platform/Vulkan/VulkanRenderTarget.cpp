@@ -20,7 +20,7 @@ namespace Aurion::Vulkan
         m_driver->WaitIdle(); // Let all GPU work finish before destruction
     }
 
-    void RenderTarget::Configure(const GraphicsResource::Config* properties)
+    void RenderTarget::Configure(const GraphicsInterface::Config* properties)
     {
         switch (dynamic_cast<const ConfigBase*>(properties)->rtType)
         {
@@ -136,7 +136,7 @@ namespace Aurion::Vulkan
         m_driver->WaitIdle(); // Let all GPU work finish before destruction
     }
 
-    void RenderTargetImpl_Default::Configure(const Driver* driver, const GraphicsResource::Config* properties)
+    void RenderTargetImpl_Default::Configure(const Driver* driver, const GraphicsInterface::Config* properties)
     {
         m_driver = driver;
         m_config = *dynamic_cast<const RenderTarget::Config*>(properties);
@@ -241,7 +241,7 @@ namespace Aurion::Vulkan
         m_driver->WaitIdle(); // Let all GPU work finish before destruction
     }
 
-    void RenderTargetImpl_Swapchain::Configure(const Driver* driver, const GraphicsResource::Config* properties)
+    void RenderTargetImpl_Swapchain::Configure(const Driver* driver, const GraphicsInterface::Config* properties)
     {
         m_driver = driver;
         m_config = *dynamic_cast<const RenderTarget::SwapchainConfig*>(properties);

@@ -19,7 +19,7 @@ namespace Aurion::Vulkan
         m_driver->WaitIdle();
     }
 
-    void Buffer::Configure(const GraphicsResource::Config* properties)
+    void Buffer::Configure(const GraphicsInterface::Config* properties)
     {
         // Save local configuration
         m_config = *dynamic_cast<const Config*>(properties);

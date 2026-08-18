@@ -14,10 +14,10 @@ export namespace Aurion::Vulkan
 {
     class Driver;
 
-    class DescriptorPool : public GraphicsResource
+    class DescriptorPool : public GraphicsInterface
     {
     public:
-        struct Config : GraphicsResource::Config
+        struct Config : GraphicsInterface::Config
         {
             u32 max_sets = 0;
             vk::DescriptorPoolCreateFlags flags{};
@@ -28,7 +28,7 @@ export namespace Aurion::Vulkan
         explicit DescriptorPool(const std::string_view& id);
         ~DescriptorPool() override;
 
-        void Configure(const GraphicsResource::Config* properties) override;
+        void Configure(const GraphicsInterface::Config* properties) override;
         void Attach(const IGraphicsDriver* driver) override;
 
         std::span<vk::raii::DescriptorSet> AllocateDescriptorSets(const u32& count, const vk::DescriptorSetLayout* layouts);

@@ -29,14 +29,11 @@ export namespace Aurion::Vulkan
         const vk::raii::Context& GetContext();
         const vk::raii::Instance& GetInstance();
 
-        std::shared_ptr<Vulkan::Driver> CreateDriver(const Vulkan::DriverConfig& config);
+        // Creates a Vulkan driver instance based on the provided GPU and Logical Device properties, tied to this API instance.
+        std::shared_ptr<Vulkan::Driver> CreateDriver(const PhysicalDeviceProperties& pDeviceProps, const DeviceProperties& device_props) const;
 
-        // Attempts to select a suitable GPU for Vulkan operations based on
-        // the provided arguments, or the defaults if no arguments are specified.
-        vk::raii::PhysicalDevice GetPhysicalDevice(
-            const PhysicalDeviceProperties* prop_reqs = nullptr,
-            const PhysicalDeviceSuitabilityFn& suitability_fn = nullptr
-        ) const;
+        // Attempts to select a suitable GPU for Vulkan operations.
+        [[nodiscard]] vk::raii::PhysicalDevice GetPhysicalDevice(const PhysicalDeviceProperties& props) const;
 
     private:
         void OnRegister() override;

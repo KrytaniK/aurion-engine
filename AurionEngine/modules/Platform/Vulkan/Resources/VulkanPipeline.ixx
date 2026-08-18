@@ -31,7 +31,7 @@ export namespace Aurion::Vulkan
             : Aurion::Pipeline(id), m_driver(nullptr), m_pipeline(nullptr), m_layout(nullptr) {};
         ~Pipeline() override = default;
 
-        void Configure(const GraphicsResource::Config* properties) override = 0;
+        void Configure(const GraphicsInterface::Config* properties) override = 0;
 
         void Attach(const IGraphicsDriver* driver) override = 0;
 
@@ -62,7 +62,7 @@ export namespace Aurion::Vulkan
         explicit GraphicsPipeline(const std::string_view& id);
         ~GraphicsPipeline() override;
 
-        void Configure(const GraphicsResource::Config* properties) override;
+        void Configure(const GraphicsInterface::Config* properties) override;
         void Attach(const IGraphicsDriver* driver) override;
 
     protected:

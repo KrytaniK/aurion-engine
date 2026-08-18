@@ -23,7 +23,7 @@ namespace Aurion::Vulkan
 
     }
 
-    void GraphicsPipeline::Configure(const GraphicsResource::Config* properties)
+    void GraphicsPipeline::Configure(const GraphicsInterface::Config* properties)
     {
         m_config = *dynamic_cast<const Config*>(properties);
 

@@ -27,12 +27,12 @@ export namespace Aurion
 
         // Register an application service in-place
         template <typename T, typename... Args>
-        static bool RegisterService(Args&&... args);
+        static const T* RegisterService(Args&&... args);
 
         // Register an application service
         // Note: This transfers ownership!
         template <typename T>
-        static bool RegisterService(const T&& service);
+        static const T* RegisterService(const T&& service);
 
         // Restart an existing application service
         // Note: This will keep the old service instance!
@@ -82,7 +82,7 @@ export namespace Aurion
     }
 
     template <typename T, typename... Args>
-    bool ServiceLocator::RegisterService(Args&&... args)
+    const T* ServiceLocator::RegisterService(Args&&... args)
     {
         static_assert(std::is_base_of_v<IService, T>, "Service Type must derive from IService");
 
@@ -101,11 +101,11 @@ export namespace Aurion
         // Manually trigger service registration
         iter->second->OnRegister();
 
-        return success;
+        return iter->second.get();
     }
 
     template <typename T>
-    bool ServiceLocator::RegisterService(const T&& service)
+    const T* ServiceLocator::RegisterService(const T&& service)
     {
         static_assert(std::is_base_of_v<IService, T>, "Service Type must derive from IService");
 
@@ -122,7 +122,7 @@ export namespace Aurion
         // Manually trigger service registration
         iter->second->OnRegister();
 
-        return success;
+        return iter->second.get();
     }
 
     template <typename T>
