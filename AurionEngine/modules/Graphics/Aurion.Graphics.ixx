@@ -5,7 +5,6 @@ export import :Config;
 export import :Types;
 
 export import :RenderGraph;
-export import :RenderPass;
 export import :Renderer;
 
 export import :Buffer;

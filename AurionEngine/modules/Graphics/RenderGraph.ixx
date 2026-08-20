@@ -3,34 +3,61 @@ module;
 #include <string>
 #include <vector>
 #include <memory>
+#include <cstdint>
 
 export module Aurion.Graphics:RenderGraph;
 
-import Aurion.Resources;
-import Aurion.Types;
-
-import :Buffer;
-import :RenderTarget;
-import :RenderPass;
+import :Interface;
+import :Types;
+import :Config;
 
 export namespace Aurion
 {
     class RenderGraph
     {
     public:
-        explicit RenderGraph();
+        explicit RenderGraph(const std::shared_ptr<IGraphicsDriver>& driver);
         ~RenderGraph();
 
-        // Registers a persistent gpu resource with the graph
-        void RegisterResource(const GPUHandle& handle);
+        // Registers a persistent resource with the graph
+        [[nodiscard]] const VirtualHandle& ImportResource(const std::string_view& name, const GPUHandle& handle);
 
         // Queues the creation for a transient (per-frame) buffer
-        u32 CreateTransientBuffer(const BufferDescription& desc);
+        [[nodiscard]] const VirtualHandle& CreateTransientBuffer(const std::string_view& name, const BufferDescription& desc);
 
         // Queues the creation for a transient (per-frame) render target
-        u32 CreateTransientRenderTarget(const RenderTargetDescription& desc);
+        [[nodiscard]] const VirtualHandle& CreateTransientRenderTarget(const std::string_view& name, const RenderTargetDescription& desc);
 
         void AddPass(const RenderPassDescription& desc);
+
+        void Export(const std::string_view& resource_name, const u64& generation);
+
+        void Compile();
+
+        void Execute(const ICommandList& cmd, const FrameContext& ctx);
+
+        [[nodiscard]] const VirtualHandle* GetExportTarget() const;
+
+    private:
+        [[nodiscard]] std::vector<std::vector<u64>> BuildDependencyGraph() const;
+
+        [[nodiscard]] std::vector<u64> CullPasses(std::span<std::vector<u64>> graph) const;
+
+        [[nodiscard]] std::vector<u64> SortPassesTopologically(std::span<std::vector<u64>> graph, std::span<u64> mask) const;
+
+        [[nodiscard]] std::vector<std::pair<u64, u64>> GetResourceLifetimes(std::span<u64> execution_order) const;
+
+        void CreateResources();
+
+        void AliasResources(std::span<std::pair<u64, u64>> lifetimes);
+
+    private:
+        std::shared_ptr<IGraphicsDriver> m_graphics_driver;
+        std::pair<const VirtualHandle*, u64> m_export_target;
+        std::vector<VirtualHandle> m_resources;
+        std::vector<BufferDescription> m_buffer_descriptions;
+        std::vector<RenderTargetDescription> m_render_target_descriptions;
+        std::vector<RenderPassDescription> m_passes;
     };
 
     // class RenderGraph

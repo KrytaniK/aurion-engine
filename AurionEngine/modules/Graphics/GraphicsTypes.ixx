@@ -3,6 +3,7 @@ module;
 #include <string>
 #include <vector>
 #include <functional>
+#include <cstdint>
 
 export module Aurion.Graphics:Types;
 
@@ -11,7 +12,17 @@ import Aurion.Types;
 
 export namespace Aurion
 {
+    // A packed unsigned 64-bit integer representing the back-end GPU object
     struct GPUHandle { u64 value = 0; };
+
+    inline constexpr u64 k_handle_type_offset = 0;
+    inline constexpr u64 k_handle_type_bits = 8;
+    inline constexpr u64 k_handle_index_offset = k_handle_type_offset + k_handle_type_bits;
+    inline constexpr u64 k_handle_index_bits = 16;
+    inline constexpr u64 k_handle_gen_offset = k_handle_index_offset + k_handle_index_bits;
+    inline constexpr u64 k_handle_gen_bits = 32;
+
+    static_assert(k_handle_gen_offset + k_handle_gen_bits <= 64, "Handle fields overflow 64 bits");
 
     // Generic Type Handles
 
@@ -25,6 +36,7 @@ export namespace Aurion
     struct ResourcePoolHandle : GPUHandle {};
     struct ResourceGroupHandle : GPUHandle {};
     struct ResourceGroupLayoutHandle : GPUHandle {};
+    struct ResourceMemoryHandle : GPUHandle {};
 
     // Debug Handles
 
@@ -60,6 +72,49 @@ export namespace Aurion
         // --- Explicit Sampler Types ---
 
         CombinedTextureSampler
+    };
+
+    enum class ResourceCreateFlags : u16
+    {
+        None                    = 0,
+        Aliasable               = 1 << 0,
+        MutableFormat           = 1 << 1,
+
+        // --- view-shape compatibility (image-only) ---
+
+        CubeCompatible          = 1 << 2,
+        Array2DCompatible       = 1 << 3,
+        BlockTexelViewCompat    = 1 << 4,
+
+        // --- sparse / virtual ---
+
+        SparseBinding           = 1 << 5,
+        SparseResidency         = 1 << 6,
+        SparseAliased           = 1 << 7,
+
+        // --- interop / sharing / protection ---
+
+        CrossAdapter            = 1 << 8,
+        Exportable              = 1 << 9,
+        Protected               = 1 << 10,
+
+        // --- concurrency ---
+
+        SimultaneousAccess      = 1 << 11,
+    };
+
+    // Explicit usage flags for identifying resource state transitions inside a render graph
+    enum class ResourceUsageIntent : u8
+    {
+        None = 0,
+        ColorAttachment,
+        DepthStencilRead,
+        DepthStencilWrite,
+        ShaderRead,
+        StorageWrite,
+        TransferSrc,
+        TransferDst,
+        Present,
     };
 
     enum class SharingMode : u8
@@ -459,6 +514,12 @@ export namespace Aurion
 
     // Explicit Flag instantiations
 
+    template<> struct EnableBitwiseFlags<ResourceCreateFlags> : std::true_type {};
+    template struct Flags<ResourceCreateFlags>;
+
+    template<> struct EnableBitwiseFlags<ResourceUsageIntent> : std::true_type {};
+    template struct Flags<ResourceUsageIntent>;
+
     template<> struct EnableBitwiseFlags<ImageAspect> : std::true_type {};
     template struct Flags<ImageAspect>;
 
@@ -485,6 +546,15 @@ export namespace Aurion
 
     template<> struct EnableBitwiseFlags<PipelineAccess> : std::true_type {};
     template struct Flags<PipelineAccess>;
+
+    // A virtual handle to a back-end GPU object, for use within the render graph
+    struct VirtualHandle : GPUHandle
+    {
+        std::string name{}; // The name identifying this resource
+        u64 resource_index = UINT64_MAX; // The index of the resource within the render graph
+        u64 desc_index = UINT64_MAX; // The index of the description structure in the render graph for this resource
+        GPUResourceType type = GPUResourceType::Unknown;
+    };
 
     struct Extent
     {
@@ -599,12 +669,6 @@ export namespace Aurion
         u32 count = 0;
     };
 
-    struct RenderPassResource
-    {
-        std::string name{};
-        u32 generation = 0;
-    };
-
     struct FrameContext
     {
         u32 frame_index = 0;
@@ -664,6 +728,54 @@ export namespace Aurion
         std::vector<BufferBarrier> buffers{};
     };
 
+    struct SubresourceTransition
+    {
+        GPUHandle resource{};
+        Flags<PipelineAccess> src_access = PipelineAccess::None;
+        Flags<PipelineAccess> dst_access = PipelineAccess::None;
+        PipelineStage src_stage = PipelineStage::None;
+        PipelineStage dst_stage = PipelineStage::None;
+        SubresourceRange subresource_range{};
+    };
+
+    struct RenderGraphResource
+    {
+        std::string name{};
+        u32 generation = 0;
+        ResourceUsageIntent usage = ResourceUsageIntent::None;
+    };
+
+    struct ResourceMemoryRequirements
+    {
+        u64 size = 0;
+        u64 alignment = 0;
+        u32 memory_type_mask = 0;
+        bool prefers_dedicated_memory = false;
+        bool requires_dedicated_memory = false;
+    };
+
     struct ICommandList;
     typedef std::function<void(ICommandList&, const FrameContext&)> RenderPassExecFn;
+
+    constexpr GPUResourceType GPUHandleType(const GPUHandle& handle)
+    {
+        return static_cast<GPUResourceType>(
+            (handle.value >> k_handle_type_offset) & ((1ul << k_handle_type_bits) - 1)
+        );
+    };
+
+    constexpr u16 GPUHandleIndex(const GPUHandle& handle)
+    {
+        return static_cast<u16>(
+            (handle.value >> k_handle_index_offset) & ((1ul << k_handle_index_bits) - 1)
+        );
+    }
+
+    constexpr u32 GPUHandleGeneration(const GPUHandle& handle)
+    {
+        return static_cast<u32>(
+            (handle.value >> k_handle_gen_offset) & ((1ul << k_handle_gen_bits) - 1)
+        );
+    }
+
 }

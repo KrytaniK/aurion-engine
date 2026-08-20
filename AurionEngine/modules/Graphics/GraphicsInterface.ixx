@@ -25,6 +25,9 @@ export namespace Aurion
     {
         virtual ~ICommandList() = default;
 
+        virtual void BeginRecording(const RenderTargetHandle& target) = 0;
+        virtual void EndRecording() = 0;
+
         // --- Pipeline + Dynamic State
 
         virtual void BindPipeline(const PipelineBindPoint& bind_point, const PipelineHandle& pipeline) = 0;
@@ -73,12 +76,7 @@ export namespace Aurion
 
         // --- Transition Commands ---
 
-        virtual void TransitionSubresource(const GPUHandle& resource,
-            const Flags<PipelineAccess>& src_access, const Flags<PipelineAccess>& dst_access,
-            const PipelineStage& src_stage, const PipelineStage& dst_stage,
-            const TextureLayout& old_layout, const TextureLayout& new_layout,
-            const SubresourceRange& subresource_range
-        ) = 0;
+        virtual void TransitionSubresource(const SubresourceTransition& transition) = 0;
 
         virtual void PipelineBarrier(const PipelineBarrierGroup& barriers) = 0;
 
@@ -129,10 +127,16 @@ export namespace Aurion
 
         virtual void Release(GPUHandle& handle) = 0;
 
-        // --- Resource Binding ---
+        // --- Resource & Memory Binding ---
 
         virtual void UpdateResourceGroupBinding(const ResourceBindingUpdate& update) = 0;
         virtual void UpdateResourceGroupBindings(std::span<ResourceBindingUpdate> updates) = 0;
+
+        [[nodiscard]] virtual ResourceMemoryRequirements QueryMemoryRequirements(const BufferDescription& buffer_desc) = 0;
+        [[nodiscard]] virtual ResourceMemoryRequirements QueryMemoryRequirements(const RenderTargetDescription& render_target_desc) = 0;
+
+        [[nodiscard]] virtual ResourceMemoryHandle AllocateResourceMemory(const ResourceMemoryRequirements& requirements) = 0;
+        virtual void BindResourceMemory(const GPUHandle& resource, const ResourceMemoryHandle& memory) = 0;
 
         // --- Resource Handle Retrieval ---
 

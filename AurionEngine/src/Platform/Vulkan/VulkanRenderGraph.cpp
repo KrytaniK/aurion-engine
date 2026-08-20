@@ -18,66 +18,6 @@ import Aurion.Types;
 
 namespace Aurion::Vulkan
 {
-    RenderGraph::RenderGraph(const std::shared_ptr<IGraphicsDriver>& driver)
-        : Aurion::RenderGraph()
-    {
-        m_driver = std::dynamic_pointer_cast<Vulkan::Driver>(driver);
-    }
-
-    void RenderGraph::RegisterBuffer(const ResourceHandle<Aurion::Buffer>& buffer)
-    {
-        m_buffers.push_back(buffer);
-    }
-
-    void RenderGraph::RegisterRenderTarget(const ResourceHandle<Aurion::RenderTarget>& render_target)
-    {
-        m_render_targets.push_back(render_target);
-    }
-
-    const ResourceHandle<Aurion::Buffer>& RenderGraph::CreateBuffer(const Aurion::Buffer::Config* desc)
-    {
-        // Cache the config structure for later processing
-        m_buffer_configs.emplace_back(
-            *dynamic_cast<const Vulkan::Buffer::Config*>(desc),
-            m_buffers.size()
-        );
-
-        // Generate an empty handle through the renderer
-        auto handle = m_driver->CreateBuffer(desc->name);
-
-        // Push a copy into the buffer array
-        m_buffers.push_back(handle);
-
-        // And return a reference to the copy
-        return m_buffers.back();
-    }
-
-    const ResourceHandle<Aurion::RenderTarget>& RenderGraph::CreateRenderTarget(const Aurion::RenderTarget::Config* desc)
-    {
-        // Cache the config structure for later processing
-        m_render_target_configs.emplace_back(
-            *dynamic_cast<const Vulkan::RenderTarget::Config*>(desc),
-            m_render_targets.size()
-        );
-
-        // Generate an empty handle through the renderer
-        auto handle = m_driver->CreateRenderTarget(desc->name);
-
-        // Push a copy into the render target array
-        m_render_targets.push_back(handle);
-
-        // And return a reference to the copy
-        return m_render_targets.back();
-    }
-
-    void RenderGraph::AddPass(const Aurion::RenderPass* desc)
-    {
-        const auto vk_pass = static_cast<const Vulkan::RenderPass*>(desc);
-
-        // Copy pass description
-        m_pass_descriptions.push_back(std::make_shared<Vulkan::RenderPass>(*vk_pass));
-    }
-
     Aurion::RenderGraph::CompilationResult RenderGraph::Compile()
     {
         Aurion::RenderGraph::CompilationResult result{};

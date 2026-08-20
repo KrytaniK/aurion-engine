@@ -124,6 +124,7 @@ export namespace Aurion
     struct BufferDescription
     {
         u32 size = 0;
+        Flags<ResourceCreateFlags> create_flags = ResourceCreateFlags::None;
         Flags<BufferUsage> usage = BufferUsage::StorageBuffer;
         SharingMode share_mode = SharingMode::Exclusive;
         Flags<MemoryProperties> properties = MemoryProperties::DeviceLocal;
@@ -142,6 +143,7 @@ export namespace Aurion
         u32 base_array_layer = 0;
         TextureType type = TextureType::TwoDimensional;
         Format format = Format::Undefined;
+        Flags<ResourceCreateFlags> create_flags = ResourceCreateFlags::None;
         Flags<TextureUsage> usage = TextureUsage::ColorAttachment;
         SharingMode sharing_mode = SharingMode::Exclusive;
         SampleCount samples = SampleCount::Sample1;
@@ -194,8 +196,8 @@ export namespace Aurion
     struct RenderPassDescription
     {
         std::string name;
-        std::vector<RenderPassResource> inputs{};
-        std::vector<RenderPassResource> outputs{};
+        std::vector<RenderGraphResource> reads{};
+        std::vector<RenderGraphResource> writes{};
         RenderPassExecFn on_execute = nullptr;
     };
 
