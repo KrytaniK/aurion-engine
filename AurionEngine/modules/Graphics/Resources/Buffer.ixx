@@ -5,7 +5,7 @@ module;
 
 export module Aurion.Graphics:Buffer;
 
-import Aurion.Resources;
+import Aurion.Assets;
 import Aurion.Types;
 
 import :Interface;
@@ -32,7 +32,7 @@ export namespace Aurion
 
     private:
         std::shared_ptr<IGraphicsDriver> m_driver;
-        std::shared_ptr<PipelineHandle> m_handle;
+        std::shared_ptr<BufferHandle> m_handle;
         std::string m_alias;
         u64 m_id;
     };

@@ -14,7 +14,7 @@ namespace Aurion
         m_id = std::hash<std::string_view>()(id);
 
         // Promote GPU handle to a shared pointer
-        m_handle = std::make_shared<ShaderHandle>(m_driver->CreatePipeline(desc));
+        m_handle = std::make_shared<ShaderHandle>(m_driver->CreateShader(desc));
     }
 
     Shader::~Shader()

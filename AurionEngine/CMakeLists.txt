@@ -46,11 +46,10 @@ FetchContent_MakeAvailable(aurion-core)
 FetchContent_MakeAvailable(glm)
 
 # Vulkan
-find_package(slang CONFIG HINTS "$ENV{VULKAN_SDK}/lib/cmake")
+find_package(Vulkan REQUIRED)
 
 if (Vulkan_FOUND)
     include_directories(${Vulkan_INCLUDE_DIRS})
-    link_libraries(${VULKAN_LIBRARY_DIRS})
 endif ()
 
 target_link_libraries(aurion-engine PRIVATE glfw)

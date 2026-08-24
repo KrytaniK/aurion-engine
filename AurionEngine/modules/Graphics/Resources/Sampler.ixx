@@ -29,7 +29,7 @@ export namespace Aurion
 
     private:
         std::shared_ptr<IGraphicsDriver> m_driver;
-        std::shared_ptr<PipelineHandle> m_handle;
+        std::shared_ptr<SamplerHandle> m_handle;
         std::string m_alias;
         u64 m_id;
     };

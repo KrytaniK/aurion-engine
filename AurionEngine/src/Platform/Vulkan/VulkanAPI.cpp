@@ -16,12 +16,12 @@ namespace Aurion::Vulkan
         : m_config(config), m_instance(nullptr), m_debug_messenger(nullptr)
     { }
 
-    const vk::raii::Context& API::GetContext()
+    const vk::raii::Context& API::GetContext() const
     {
         return m_context;
     }
 
-    const vk::raii::Instance& API::GetInstance()
+    const vk::raii::Instance& API::GetInstance() const
     {
         return m_instance;
     }

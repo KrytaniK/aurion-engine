@@ -4,6 +4,7 @@ module;
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include <span>
 
 export module Aurion.Graphics:RenderGraph;
 
@@ -30,13 +31,13 @@ export namespace Aurion
 
         void AddPass(const RenderPassDescription& desc);
 
-        void Export(const std::string_view& resource_name, const u64& generation);
+        void Export(const std::string_view& resource_name, const u64& generation, const ResourceUsageIntent& output_usage);
 
         void Compile();
 
-        void Execute(const ICommandList& cmd, const FrameContext& ctx);
+        void Execute(ICommandList& cmd, const FrameContext& ctx) const;
 
-        [[nodiscard]] const VirtualHandle* GetExportTarget() const;
+        [[nodiscard]] const RenderGraphResource* GetExportTarget() const;
 
     private:
         [[nodiscard]] std::vector<std::vector<u64>> BuildDependencyGraph() const;
@@ -47,17 +48,18 @@ export namespace Aurion
 
         [[nodiscard]] std::vector<std::pair<u64, u64>> GetResourceLifetimes(std::span<u64> execution_order) const;
 
-        void CreateResources();
-
         void AliasResources(std::span<std::pair<u64, u64>> lifetimes);
+
+        void ResolvePassResourceHandles();
 
     private:
         std::shared_ptr<IGraphicsDriver> m_graphics_driver;
-        std::pair<const VirtualHandle*, u64> m_export_target;
+        const RenderGraphResource* m_export_target;
         std::vector<VirtualHandle> m_resources;
         std::vector<BufferDescription> m_buffer_descriptions;
         std::vector<RenderTargetDescription> m_render_target_descriptions;
         std::vector<RenderPassDescription> m_passes;
+        std::vector<u64> m_execution_order;
     };
 
     // class RenderGraph

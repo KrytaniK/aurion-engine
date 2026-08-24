@@ -32,7 +32,7 @@ namespace Aurion::Vulkan
         m_cmd_buffers = std::move(vk::raii::CommandBuffers(device, allocInfo));
     }
 
-    Queue QueueFamily::GetQueue(const vk::raii::Device& device, const u32& index)
+    QueueData QueueFamily::GetQueue(const vk::raii::Device& device, const u32& index)
     {
         const u64 start = std::min(static_cast<u64>(index * m_scale), m_cmd_buffers.size());
         const u64 end = std::min(start + m_scale, m_cmd_buffers.size());

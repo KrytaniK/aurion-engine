@@ -8,16 +8,12 @@ export module Aurion.Vulkan:Queue;
 import Aurion.Graphics;
 import Aurion.Types;
 
+import :Types;
 import :Config;
 
 export namespace Aurion::Vulkan
 {
-    struct Queue
-    {
-        u32 family_index = 0;
-        vk::raii::Queue handle = nullptr;
-        std::span<vk::raii::CommandBuffer> command_buffers{};
-    };
+
 
     // A wrapper around VkQueueFamilyProperties to encapsulate associated command buffers
     class QueueFamily : public vk::QueueFamilyProperties
@@ -32,7 +28,7 @@ export namespace Aurion::Vulkan
         //  in-flight frames.
         void AllocateCommandBuffers(const vk::raii::Device& device, const vk::CommandBufferLevel& buffer_level, const u32& scale = 1);
 
-        [[nodiscard]] Queue GetQueue(const vk::raii::Device& device, const u32& index);
+        [[nodiscard]] QueueData GetQueue(const vk::raii::Device& device, const u32& index);
 
         [[nodiscard]] const vk::raii::CommandBuffer& GetCommandBuffer(const u32& index);
 

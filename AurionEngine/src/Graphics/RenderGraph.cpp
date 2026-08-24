@@ -6,13 +6,15 @@ module;
 #include <string>
 #include <memory>
 #include <cstdint>
+#include <span>
+#include <functional>
 
 module Aurion.Graphics;
 
 namespace Aurion
 {
     RenderGraph::RenderGraph(const std::shared_ptr<IGraphicsDriver>& driver)
-        : m_graphics_driver(driver), m_export_target({nullptr, 0}), m_buffer_descriptions({}), m_render_target_descriptions({})
+        : m_graphics_driver(driver), m_export_target(nullptr), m_buffer_descriptions({}), m_render_target_descriptions({})
     {
         m_buffer_descriptions.reserve(8);
         m_render_target_descriptions.reserve(8);
@@ -59,30 +61,28 @@ namespace Aurion
         m_passes.push_back(desc);
     }
 
-    void RenderGraph::Export(const std::string_view& resource_name, const u64& generation)
+    void RenderGraph::Export(const std::string_view& resource_name, const u64& generation, const ResourceUsageIntent& output_usage)
     {
+        // TODO: output_usage is currently unused. The intent is to allow post-graph resource transitions for export targets
+        //          that are required to be in a different state/layout than they were at the end of graph execution.
+
         // Make sure a pass has actually declared this resource as a written resource
         bool found = false;
         for (const auto& pass : m_passes)
         {
             auto it = std::ranges::find_if(pass.writes, [&](const auto& write){
-                return write.name == m_export_target.first->name && write.generation == m_export_target.second;
+                return write.name == resource_name && write.generation == generation;
             });
 
-            found = found || it != pass.writes.end();
+            if (it != pass.writes.end())
+            {
+                m_export_target = &*it;
+                return;
+            }
         }
 
         // An invalid export should not throw an error. The graph will simply run in its entirety
-        if (!found)
-        {
-            AURION_ERROR("Failed to export target '%s', generation '%d': The specified resource/version combination is not a written resource of any known pass.", resource_name, generation);
-            return;
-        }
-
-
-        for (const auto& resource : m_resources)
-            if (resource.name == resource_name)
-                m_export_target = std::make_pair(&resource, generation);
+        AURION_ERROR("Failed to export target '%s', generation '%d': The specified resource/version combination is not a written resource of any known pass.", std::string(resource_name).c_str(), generation);
     }
 
     void RenderGraph::Compile()
@@ -94,30 +94,105 @@ namespace Aurion
         auto cull_mask = CullPasses(dep_graph);
 
         // Determine pass execution order
-        auto exec_order = SortPassesTopologically(dep_graph, cull_mask);
+        m_execution_order = SortPassesTopologically(dep_graph, cull_mask);
 
         // Determine Resource lifetimes
-        auto resource_lts = GetResourceLifetimes(exec_order);
+        auto resource_lts = GetResourceLifetimes(m_execution_order);
 
         // Then alias transient resources whose lifetimes don't overlap
         AliasResources(resource_lts);
+
+        // Once resources have been created, resolve the handles for each pass
+        ResolvePassResourceHandles();
     }
 
-    void RenderGraph::Execute(const ICommandList& cmd, const FrameContext& ctx)
+    void RenderGraph::Execute(ICommandList& cmd, const FrameContext& ctx) const
     {
+        std::unordered_map<u64, ResourceUsageIntent> resource_intents{};
 
+        for (const auto& pass_idx : m_execution_order) {
+            auto& pass = m_passes[pass_idx];
+
+            PipelineBarrierGroup barrier_group{};
+            std::vector<SubresourceTransition> subresource_transitions{};
+
+            auto process = [&](const RenderGraphResource& res) {
+                const auto& current_intent = resource_intents[res.handle.value];
+
+                if (current_intent == res.usage) return;
+
+                // If a state mismatch is found, a barrier must be injected
+                switch (GPUHandleType(res.handle))
+                {
+                case GPUResourceType::Buffer:
+                    {
+                        BufferBarrier barrier{};
+                        barrier.buffer = static_cast<BufferHandle>(res.handle);
+                        barrier.offset = 0;
+                        barrier.size = 0ull;
+                        barrier.src_access = AccessFromUsageIntent(current_intent);
+                        barrier.dst_access = AccessFromUsageIntent(res.usage);
+
+                        barrier_group.buffers.push_back(barrier);
+                    }
+                case GPUResourceType::RenderTarget:
+                    {
+                        ImageBarrier barrier{};
+                        barrier.image = static_cast<TextureHandle>(res.handle);
+                        barrier.src_layout = LayoutFromUsageIntent(current_intent);
+                        barrier.dst_layout = LayoutFromUsageIntent(res.usage);
+                        barrier.src_access = AccessFromUsageIntent(current_intent);
+                        barrier.dst_access = AccessFromUsageIntent(res.usage);
+                        barrier.subresource_range = {}; // TODO: This might matter
+
+                        barrier_group.images.push_back(barrier);
+                    }
+                default: {}
+                }
+            };
+
+            for (const auto& write : pass.writes) process(write);
+            for (const auto& read  : pass.reads)  process(read);
+
+            // Inject batched barriers before the pass executes
+            cmd.PipelineBarrier(barrier_group);
+
+            if (m_export_target == nullptr)
+                pass.on_execute(cmd, ctx);
+            else
+            {
+                cmd.BeginRecording(static_cast<RenderTargetHandle>(m_export_target->handle));
+                pass.on_execute(cmd, ctx);
+                cmd.EndRecording();
+            }
+        }
+
+        // After all passes execute, transition export target to final layout
+        {
+            const auto& current_intent = resource_intents[m_export_target->handle.value];
+            ImageBarrier barrier{};
+            barrier.image = static_cast<TextureHandle>(m_export_target->handle);
+            barrier.src_access = AccessFromUsageIntent(current_intent);
+            barrier.dst_access = PipelineAccess::None;
+            barrier.src_layout = LayoutFromUsageIntent(current_intent);
+            barrier.dst_layout = LayoutFromUsageIntent(m_export_target->usage);
+
+            cmd.PipelineBarrier({
+                .images = { barrier }
+            });
+        }
     }
 
-    const VirtualHandle* RenderGraph::GetExportTarget() const
+    const RenderGraphResource* RenderGraph::GetExportTarget() const
     {
-        return m_export_target.first;
+        return m_export_target;
     }
 
     std::vector<std::vector<u64>> RenderGraph::BuildDependencyGraph() const
     {
-        std::vector<std::vector<u64>> graph{};
+        std::vector<std::vector<u64>> graph(m_passes.size());
 
-        std::hash<std::string> hash;
+        constexpr std::hash<std::string> hash{};
         std::unordered_map<u64, u64> writes{};
 
         // Map each resource + generation combo to the pass that produces it
@@ -155,7 +230,7 @@ namespace Aurion
     std::vector<u64> RenderGraph::CullPasses(std::span<std::vector<u64>> graph) const
     {
         // If there's no export target, all passes are valid
-        if (m_export_target.first->resource_index == UINT64_MAX)
+        if (m_export_target == nullptr)
             return std::vector<u64>(graph.size(), 1u);
 
         // Figure out which pass produces the exported render target
@@ -165,7 +240,7 @@ namespace Aurion
             const auto& writes = m_passes[final_pass_idx].writes;
 
             auto it = std::ranges::find_if(writes, [&](const auto& write){
-                return write.name == m_export_target.first->name && write.generation == m_export_target.second;
+                return write.name == m_export_target->name && write.generation == m_export_target->generation;
             });
 
             if (it != writes.end())
@@ -264,33 +339,6 @@ namespace Aurion
         }
 
         return std::move(resource_lts);
-    }
-
-    void RenderGraph::CreateResources()
-    {
-        for (auto& resource : m_resources)
-        {
-            // Imported resources don't have description structures
-            if (resource.desc_index == UINT64_MAX) continue;
-
-            switch (resource.type)
-            {
-            case GPUResourceType::Buffer:
-                {
-                    resource.value = m_graphics_driver->CreateBuffer(m_buffer_descriptions[resource.desc_index]).value;
-                    break;
-                }
-            case GPUResourceType::RenderTarget:
-                {
-                    resource.value = m_graphics_driver->CreateRenderTarget(m_render_target_descriptions[resource.desc_index]).value;
-                    break;
-                }
-            default:
-                {
-                    AURION_WARN("[Render Graph] Unsupported Resource '%s' with type '%d'!", resource.name, resource.type);
-                }
-            }
-        }
     }
 
     void RenderGraph::AliasResources(std::span<std::pair<u64, u64>> lifetimes)
@@ -426,7 +474,7 @@ namespace Aurion
             alias_batches[i] = sub_batch;
         }
 
-        // Once batches have been filtered, resources can be created
+        // Once batches have been filtered, transient resources can be created
         for (auto& resource : m_resources)
         {
             if (resource.desc_index == UINT64_MAX) continue;
@@ -455,6 +503,7 @@ namespace Aurion
         for (u64 i = 0; i < alias_batches.size(); ++i)
         {
             if (alias_mask[i]) continue; // If a resource is aliased, don't allocate memory for it
+            if (m_resources[i].desc_index == UINT64_MAX) continue; // Imported resources already have memory bound
 
             // Each batch index should contain the aggregate memory requirements for the entire batch
             //  where the batch has been filtered
@@ -463,13 +512,30 @@ namespace Aurion
             auto memory = m_graphics_driver->AllocateResourceMemory(batch_reqs);
 
             // Once allocated and bound, mark the entire batch as aliased
-            m_graphics_driver->BindResourceMemory(m_resources[i], memory);
+            m_graphics_driver->BindResourceMemory(m_resources[i], memory, 0);
             alias_mask[i] = true;
             for (const auto& resource : alias_batches[i])
             {
-                m_graphics_driver->BindResourceMemory(m_resources[resource], memory);
+                m_graphics_driver->BindResourceMemory(m_resources[resource], memory, 0);
                 alias_mask[resource] = true;
             }
+        }
+    }
+
+    void RenderGraph::ResolvePassResourceHandles()
+    {
+        auto process = [&](RenderGraphResource& pass_res)
+        {
+            pass_res.handle = *std::ranges::find_if(m_resources, [&](const VirtualHandle& handle)
+            {
+                return handle.name == pass_res.name;
+            });
+        };
+
+        for (auto& pass : m_passes)
+        {
+            for (auto& read : pass.reads) process(read);
+            for (auto& write : pass.reads) process(write);
         }
     }
 }

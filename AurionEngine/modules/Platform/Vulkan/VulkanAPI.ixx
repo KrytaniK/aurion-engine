@@ -26,8 +26,8 @@ export namespace Aurion::Vulkan
         explicit API(const APIConfig& config);
         ~API() override = default;
 
-        const vk::raii::Context& GetContext();
-        const vk::raii::Instance& GetInstance();
+        const vk::raii::Context& GetContext() const;
+        const vk::raii::Instance& GetInstance() const;
 
         // Creates a Vulkan driver instance based on the provided GPU and Logical Device properties, tied to this API instance.
         std::shared_ptr<Vulkan::Driver> CreateDriver(const PhysicalDeviceProperties& pDeviceProps, const DeviceProperties& device_props) const;

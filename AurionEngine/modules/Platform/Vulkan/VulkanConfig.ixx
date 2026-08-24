@@ -31,16 +31,6 @@ export namespace Aurion::Vulkan
         std::vector<float> priorities{};
     };
 
-    // Handles Vulkan Logical Device Configuration
-    struct DeviceProperties
-    {
-        // A list of queue type preferences, paired with the desired queue creation amount and its priority
-        const std::vector<QueueDescription> queues{};
-        const std::vector<const char*>& extensions{}; // Required device extensions (if any)
-        vk::PhysicalDeviceFeatures2* features = nullptr; // Required device features (if any)
-        u32 max_in_flight_frames = 3; // At maximum, triple-buffer frames by default
-    };
-
     // Describes the desired property requirements for GPU selection
     struct PhysicalDeviceProperties
     {
@@ -51,4 +41,12 @@ export namespace Aurion::Vulkan
         GPUSuitabilityFn gpu_suitability_fn = nullptr;
     };
 
+    // Handles Vulkan Logical Device Configuration
+    struct DeviceProperties
+    {
+        // A list of queue type preferences, paired with the desired queue creation amount and its priority
+        const std::vector<QueueDescription> queues{};
+        const std::vector<const char*>& extensions{}; // Required device extensions (if any)
+        vk::PhysicalDeviceFeatures2* features = nullptr; // Required device features (if any)
+    };
 }

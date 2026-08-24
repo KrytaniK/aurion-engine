@@ -2,6 +2,7 @@ module;
 
 #include <vector>
 #include <span>
+#include <string_view>
 
 export module Aurion.Graphics:Interface;
 
@@ -25,10 +26,12 @@ export namespace Aurion
     {
         virtual ~ICommandList() = default;
 
+        // --- Command Recording ---
+
         virtual void BeginRecording(const RenderTargetHandle& target) = 0;
         virtual void EndRecording() = 0;
 
-        // --- Pipeline + Dynamic State
+        // --- Pipeline + Dynamic State ---
 
         virtual void BindPipeline(const PipelineBindPoint& bind_point, const PipelineHandle& pipeline) = 0;
 
@@ -102,6 +105,7 @@ export namespace Aurion
         [[nodiscard]] virtual ShaderHandle CreateShader(const ShaderDescription& desc) = 0;
         [[nodiscard]] virtual BufferHandle CreateBuffer(const BufferDescription& desc) = 0;
         [[nodiscard]] virtual TextureHandle CreateTexture(const TextureDescription& desc) = 0;
+        [[nodiscard]] virtual TextureViewHandle CreateTextureView(const TextureViewDescription& desc) = 0;
         [[nodiscard]] virtual SamplerHandle CreateSampler(const SamplerDescription& desc) = 0;
         [[nodiscard]] virtual RenderTargetHandle CreateRenderTarget(const RenderTargetDescription& desc) = 0;
 
@@ -115,6 +119,7 @@ export namespace Aurion
         [[nodiscard]] virtual std::vector<ShaderHandle> CreateShaders(std::span<ShaderDescription> descriptions) = 0;
         [[nodiscard]] virtual std::vector<BufferHandle> CreateBuffers(std::span<BufferDescription> descriptions) = 0;
         [[nodiscard]] virtual std::vector<TextureHandle> CreateTextures(std::span<TextureDescription> descriptions) = 0;
+        [[nodiscard]] virtual std::vector<TextureViewHandle> CreateTextureViews(std::span<TextureViewDescription> descriptions) = 0;
         [[nodiscard]] virtual std::vector<SamplerHandle> CreateSamplers(std::span<SamplerDescription> descriptions) = 0;
         [[nodiscard]] virtual std::vector<RenderTargetHandle> CreateRenderTargets(std::span<RenderTargetDescription> descriptions) = 0;
 
@@ -136,15 +141,13 @@ export namespace Aurion
         [[nodiscard]] virtual ResourceMemoryRequirements QueryMemoryRequirements(const RenderTargetDescription& render_target_desc) = 0;
 
         [[nodiscard]] virtual ResourceMemoryHandle AllocateResourceMemory(const ResourceMemoryRequirements& requirements) = 0;
-        virtual void BindResourceMemory(const GPUHandle& resource, const ResourceMemoryHandle& memory) = 0;
+        virtual void BindResourceMemory(const GPUHandle& resource, const ResourceMemoryHandle& memory, const u64& offset) = 0;
 
         // --- Resource Handle Retrieval ---
 
         [[nodiscard]] virtual ResourceGroupLayoutHandle GetShaderResourceGroupLayout(const ShaderHandle& shader) = 0;
 
         // --- Buffer Operations ---
-
-        virtual void WriteBuffer(const BufferHandle& buffer) = 0;
 
         // --- Texture Operations ---
 

@@ -31,6 +31,7 @@ export namespace Aurion
     struct ShaderHandle : GPUHandle {};
     struct BufferHandle : GPUHandle {};
     struct TextureHandle : GPUHandle {};
+    struct TextureViewHandle : GPUHandle {};
     struct SamplerHandle : GPUHandle {};
     struct RenderTargetHandle : GPUHandle {};
     struct ResourcePoolHandle : GPUHandle {};
@@ -48,15 +49,13 @@ export namespace Aurion
 
         // --- Generic Types ---
 
-        Buffer,
-        Texture,
-        Sampler,
         Shader,
         Pipeline,
         RenderTarget,
 
-        // --- Explicit Buffer Types ---
+        // --- Buffer Types ---
 
+        Buffer,
         StorageBuffer,
         UniformBuffer,
         StorageBufferDynamic,
@@ -64,14 +63,27 @@ export namespace Aurion
         StorageTexelBuffer,
         UniformTexelBuffer,
 
-        // --- Explicit Texture Types ---
+        // --- Texture Types ---
 
+        Texture,
         StorageTexture,
         SampledTexture,
 
-        // --- Explicit Sampler Types ---
+        // --- Sampler Types ---
 
-        CombinedTextureSampler
+        Sampler,
+        CombinedTextureSampler,
+
+        // --- Handle-Only Types (non-asset) ---
+
+        Surface,
+        Swapchain,
+        TextureView,
+        ResourcePool,
+        ResourceGroup,
+        ResourceGroupLayout,
+        ResourceMemory,
+        QueryPool,
     };
 
     enum class ResourceCreateFlags : u16
@@ -101,6 +113,10 @@ export namespace Aurion
         // --- concurrency ---
 
         SimultaneousAccess      = 1 << 11,
+
+        // --- Resource re-use ---
+
+        ReuseAfterFree          = 1 << 12,
     };
 
     // Explicit usage flags for identifying resource state transitions inside a render graph
@@ -340,6 +356,18 @@ export namespace Aurion
         Set
     };
 
+    enum class CompareOp : u8
+    {
+        Never = 0,
+        Less,
+        Equal,
+        LessOrEqual,
+        Greater,
+        GreaterOrEqual,
+        NotEqual,
+        Always
+    };
+
     enum class Format : u8 {
         Undefined = 0,
 
@@ -419,9 +447,12 @@ export namespace Aurion
     enum class PresentMode : u8
     {
         Immediate = 0,
-        Mailbox,
-        Fifo, // VSync equivelant
-        FifoRelaxed,
+        DoubleBufferedVSync,
+        TripleBufferedVSync,
+        QuadBufferedVSync,
+        DoubleBufferedLowLatency,
+        TripleBufferedLowLatency,
+        QuadBufferedLowLatency,
     };
 
     enum class ResourcePoolAttributes : u8
@@ -510,6 +541,38 @@ export namespace Aurion
         RayTracingShader,
         TaskShader,
         MeshShader,
+    };
+
+    enum class Filter : u8
+    {
+        Nearest = 0,
+        Linear,
+        Cubic
+    };
+
+    enum class SamplerMipmapMode : u8
+    {
+        Nearest = 0,
+        Linear,
+    };
+
+    enum class SamplerAddressMode : u8
+    {
+        Repeat = 0,
+        RepeatMirrored,
+        ClampToEdge,
+        ClampToBorder,
+        ClampToEdgeMirrored,
+    };
+
+    enum class BorderColor : u8
+    {
+        TransparentBlackInt = 0,
+        TransparentBlackFloat,
+        OpaqueBlackInt,
+        OpaqueBlackFloat,
+        OpaqueWhiteInt,
+        OpaqueWhiteFloat,
     };
 
     // Explicit Flag instantiations
@@ -743,6 +806,7 @@ export namespace Aurion
         std::string name{};
         u32 generation = 0;
         ResourceUsageIntent usage = ResourceUsageIntent::None;
+        VirtualHandle handle{};
     };
 
     struct ResourceMemoryRequirements
@@ -776,6 +840,47 @@ export namespace Aurion
         return static_cast<u32>(
             (handle.value >> k_handle_gen_offset) & ((1ul << k_handle_gen_bits) - 1)
         );
+    }
+
+    constexpr u64 MakeGPUHandleValue(const GPUResourceType& type, const u16& index, const u32& generation)
+    {
+        return (static_cast<u64>(type) << k_handle_type_offset)
+            | (static_cast<u64>(index) << k_handle_index_offset)
+            | (static_cast<u64>(generation) << k_handle_gen_offset);
+    }
+
+    constexpr Flags<PipelineAccess> AccessFromUsageIntent(const ResourceUsageIntent& intent)
+    {
+        switch (intent)
+        {
+            case ResourceUsageIntent::None: return PipelineAccess::None;
+            case ResourceUsageIntent::ColorAttachment: return PipelineAccess::ColorAttachmentRead | PipelineAccess::ColorAttachmentWrite;
+            case ResourceUsageIntent::DepthStencilRead: return PipelineAccess::DepthStencilAttachmentRead;
+            case ResourceUsageIntent::DepthStencilWrite: return PipelineAccess::DepthStencilAttachmentWrite;
+            case ResourceUsageIntent::ShaderRead: return PipelineAccess::ShaderRead;
+            case ResourceUsageIntent::StorageWrite: return PipelineAccess::ShaderStorageWrite;
+            case ResourceUsageIntent::TransferSrc: return PipelineAccess::TransferRead;
+            case ResourceUsageIntent::TransferDst: return PipelineAccess::TransferWrite;
+            case ResourceUsageIntent::Present: return PipelineAccess::None;
+            default: return PipelineAccess::None;
+        }
+    }
+
+    constexpr TextureLayout LayoutFromUsageIntent(const ResourceUsageIntent& intent)
+    {
+        switch (intent)
+        {
+            case ResourceUsageIntent::None: return TextureLayout::Undefined;
+            case ResourceUsageIntent::ColorAttachment: return TextureLayout::ColorAttachment;
+            case ResourceUsageIntent::DepthStencilRead: return TextureLayout::DepthStencilReadOnly;
+            case ResourceUsageIntent::DepthStencilWrite: return TextureLayout::DepthStencilAttachment;
+            case ResourceUsageIntent::ShaderRead: return TextureLayout::ShaderReadOnly;
+            case ResourceUsageIntent::StorageWrite: return TextureLayout::General;
+            case ResourceUsageIntent::TransferSrc: return TextureLayout::TransferSrc;
+            case ResourceUsageIntent::TransferDst: return TextureLayout::TransferDst;
+            case ResourceUsageIntent::Present: return TextureLayout::PresentSrc;
+            default: return TextureLayout::Undefined;
+        }
     }
 
 }

@@ -116,7 +116,7 @@ export namespace Aurion
     {
         Flags<ResourcePoolAttributes> attributes = ResourcePoolAttributes::None;
         u32 max_groups = 0;
-        std::vector<ResourceGroupSize> group_sizes;
+        std::vector<ResourceGroupSize> group_sizes{};
     };
 
     // Buffers
@@ -134,9 +134,7 @@ export namespace Aurion
 
     struct TextureDescription
     {
-        u32 width = 0;
-        u32 height = 0;
-        u32 depth = 1;
+        Extent extent{};
         u32 mip_levels = 0;
         u32 base_mip_level = 0;
         u32 array_layers = 0;
@@ -170,7 +168,21 @@ export namespace Aurion
 
     struct SamplerDescription
     {
-
+        Filter mag_filter = Filter::Nearest;
+        Filter min_filter = Filter::Nearest;
+        SamplerMipmapMode mip_map_mode = SamplerMipmapMode::Nearest;
+        SamplerAddressMode address_mode_u = SamplerAddressMode::Repeat;
+        SamplerAddressMode address_mode_v = SamplerAddressMode::Repeat;
+        SamplerAddressMode address_mode_w = SamplerAddressMode::Repeat;
+        BorderColor border_color = BorderColor::OpaqueBlackInt;
+        CompareOp compare_op = CompareOp::Always;
+        float mip_lod_bias = 0.f;
+        float max_anisotropy = 0.f;
+        float min_lod = 0.f;
+        float max_lod = 1.f;
+        bool enable_anisotropy = false;
+        bool enable_compare = false;
+        bool unnormalize_coordinates = false;
     };
 
     // Render Targets
@@ -179,7 +191,7 @@ export namespace Aurion
     {
         Window* window = nullptr;
         ColorSpace color_space = ColorSpace::SRGBNonLinear;
-        PresentMode present_mode = PresentMode::Fifo;
+        PresentMode present_mode = PresentMode::Immediate;
         CompositeAlpha composite_alpha = CompositeAlpha::Opaque;
         bool clipped = false;
     };

@@ -101,7 +101,7 @@ export namespace Aurion
         // Manually trigger service registration
         iter->second->OnRegister();
 
-        return iter->second.get();
+        return static_cast<const T*>(iter->second.get());
     }
 
     template <typename T>
@@ -122,7 +122,7 @@ export namespace Aurion
         // Manually trigger service registration
         iter->second->OnRegister();
 
-        return iter->second.get();
+        return static_cast<const T*>(iter->second.get());
     }
 
     template <typename T>
