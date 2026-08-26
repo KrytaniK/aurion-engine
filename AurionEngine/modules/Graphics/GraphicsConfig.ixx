@@ -2,6 +2,7 @@ module;
 
 #include <string>
 #include <vector>
+#include <span>
 #include <array>
 
 export module Aurion.Graphics:Config;
@@ -203,14 +204,19 @@ export namespace Aurion
         TextureViewDescription view_desc{};
     };
 
-    // --- Render Graph Configuration ---
-
     struct RenderPassDescription
     {
         std::string name;
         std::vector<RenderGraphResource> reads{};
         std::vector<RenderGraphResource> writes{};
         RenderPassExecFn on_execute = nullptr;
+    };
+
+    struct RenderGraphCompilationResult
+    {
+        std::span<RenderPassDescription> passes{};
+        std::span<u64> execution_order{};
+        RenderGraphResource export_target{};
     };
 
 }

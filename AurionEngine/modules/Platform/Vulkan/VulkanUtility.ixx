@@ -443,6 +443,89 @@ export namespace Aurion::Vulkan
         }
     }
 
+    constexpr vk::PipelineBindPoint ToVulkanPipelineBindPoint(const PipelineBindPoint& bind_point)
+    {
+        switch (bind_point)
+        {
+            case PipelineBindPoint::Compute: return vk::PipelineBindPoint::eCompute;
+            case PipelineBindPoint::RayTracing: return vk::PipelineBindPoint::eRayTracingKHR;
+            case PipelineBindPoint::Graphics:
+            default: return vk::PipelineBindPoint::eGraphics;
+        }
+    }
+
+    constexpr vk::AccessFlags2 ToVulkanAccessFlags2(const Flags<PipelineAccess>& access)
+    {
+        vk::AccessFlags2 out{};
+        if (access & PipelineAccess::IndirectCommandRead) out |= vk::AccessFlagBits2::eIndirectCommandRead;
+        if (access & PipelineAccess::IndexRead) out |= vk::AccessFlagBits2::eIndexRead;
+        if (access & PipelineAccess::VertexAttributeRead) out |= vk::AccessFlagBits2::eVertexAttributeRead;
+        if (access & PipelineAccess::UniformRead) out |= vk::AccessFlagBits2::eUniformRead;
+        if (access & PipelineAccess::InputAttachmentRead) out |= vk::AccessFlagBits2::eInputAttachmentRead;
+        if (access & PipelineAccess::ShaderRead) out |= vk::AccessFlagBits2::eShaderRead;
+        if (access & PipelineAccess::ShaderWrite) out |= vk::AccessFlagBits2::eShaderWrite;
+        if (access & PipelineAccess::ColorAttachmentRead) out |= vk::AccessFlagBits2::eColorAttachmentRead;
+        if (access & PipelineAccess::ColorAttachmentWrite) out |= vk::AccessFlagBits2::eColorAttachmentWrite;
+        if (access & PipelineAccess::DepthStencilAttachmentRead) out |= vk::AccessFlagBits2::eDepthStencilAttachmentRead;
+        if (access & PipelineAccess::DepthStencilAttachmentWrite) out |= vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
+        if (access & PipelineAccess::TransferRead) out |= vk::AccessFlagBits2::eTransferRead;
+        if (access & PipelineAccess::TransferWrite) out |= vk::AccessFlagBits2::eTransferWrite;
+        if (access & PipelineAccess::HostRead) out |= vk::AccessFlagBits2::eHostRead;
+        if (access & PipelineAccess::HostWrite) out |= vk::AccessFlagBits2::eHostWrite;
+        if (access & PipelineAccess::MemoryRead) out |= vk::AccessFlagBits2::eMemoryRead;
+        if (access & PipelineAccess::MemoryWrite) out |= vk::AccessFlagBits2::eMemoryWrite;
+        if (access & PipelineAccess::ShaderSampledRead) out |= vk::AccessFlagBits2::eShaderSampledRead;
+        // Vulkan has no "sampled write" access - sampled images are read-only. Fall back to the
+        //  generic shader-write bit so a caller that (incorrectly) requests it still gets a safe barrier.
+        if (access & PipelineAccess::ShaderSampledWrite) out |= vk::AccessFlagBits2::eShaderWrite;
+        if (access & PipelineAccess::ShaderStorageRead) out |= vk::AccessFlagBits2::eShaderStorageRead;
+        if (access & PipelineAccess::ShaderStorageWrite) out |= vk::AccessFlagBits2::eShaderStorageWrite;
+        if (access & PipelineAccess::VideoEncodeRead) out |= vk::AccessFlagBits2::eVideoEncodeReadKHR;
+        if (access & PipelineAccess::VideoEncodeWrite) out |= vk::AccessFlagBits2::eVideoEncodeWriteKHR;
+        if (access & PipelineAccess::VideoDecodeRead) out |= vk::AccessFlagBits2::eVideoDecodeReadKHR;
+        if (access & PipelineAccess::VideoDecodeWrite) out |= vk::AccessFlagBits2::eVideoDecodeWriteKHR;
+        return out;
+    }
+
+    constexpr vk::PipelineStageFlags2 ToVulkanPipelineStage2(const PipelineStage& stage)
+    {
+        switch (stage)
+        {
+            case PipelineStage::TopOfPipe: return vk::PipelineStageFlagBits2::eTopOfPipe;
+            case PipelineStage::DrawIndirect: return vk::PipelineStageFlagBits2::eDrawIndirect;
+            case PipelineStage::VertexInput: return vk::PipelineStageFlagBits2::eVertexInput;
+            case PipelineStage::VertexShader: return vk::PipelineStageFlagBits2::eVertexShader;
+            case PipelineStage::TessellationControlShader: return vk::PipelineStageFlagBits2::eTessellationControlShader;
+            case PipelineStage::TessellationEvalShader: return vk::PipelineStageFlagBits2::eTessellationEvaluationShader;
+            case PipelineStage::GeometryShader: return vk::PipelineStageFlagBits2::eGeometryShader;
+            case PipelineStage::FragmentShader: return vk::PipelineStageFlagBits2::eFragmentShader;
+            case PipelineStage::FragmentTestEarly: return vk::PipelineStageFlagBits2::eEarlyFragmentTests;
+            case PipelineStage::FragmentTestLate: return vk::PipelineStageFlagBits2::eLateFragmentTests;
+            case PipelineStage::ColorAttachmentOutput: return vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+            case PipelineStage::ComputeShader: return vk::PipelineStageFlagBits2::eComputeShader;
+            case PipelineStage::AllTransfer: return vk::PipelineStageFlagBits2::eAllTransfer;
+            case PipelineStage::Transfer: return vk::PipelineStageFlagBits2::eTransfer;
+            case PipelineStage::BottomOfPipe: return vk::PipelineStageFlagBits2::eBottomOfPipe;
+            case PipelineStage::Host: return vk::PipelineStageFlagBits2::eHost;
+            case PipelineStage::AllGraphics: return vk::PipelineStageFlagBits2::eAllGraphics;
+            case PipelineStage::ALlCommands: return vk::PipelineStageFlagBits2::eAllCommands;
+            case PipelineStage::Copy: return vk::PipelineStageFlagBits2::eCopy;
+            case PipelineStage::Resolve: return vk::PipelineStageFlagBits2::eResolve;
+            case PipelineStage::Blit: return vk::PipelineStageFlagBits2::eBlit;
+            case PipelineStage::Clear: return vk::PipelineStageFlagBits2::eClear;
+            case PipelineStage::IndexInput: return vk::PipelineStageFlagBits2::eIndexInput;
+            case PipelineStage::VertexAttributeInput: return vk::PipelineStageFlagBits2::eVertexAttributeInput;
+            case PipelineStage::PreRasterShaders: return vk::PipelineStageFlagBits2::ePreRasterizationShaders;
+            case PipelineStage::VideoEncode: return vk::PipelineStageFlagBits2::eVideoEncodeKHR;
+            case PipelineStage::VideoDecode: return vk::PipelineStageFlagBits2::eVideoDecodeKHR;
+            case PipelineStage::RayTracingShader: return vk::PipelineStageFlagBits2::eRayTracingShaderKHR;
+            case PipelineStage::TaskShader: return vk::PipelineStageFlagBits2::eTaskShaderEXT;
+            case PipelineStage::MeshShader: return vk::PipelineStageFlagBits2::eMeshShaderEXT;
+            case PipelineStage::None:
+            default: return vk::PipelineStageFlagBits2::eNone;
+        }
+    }
+
     constexpr vk::CompareOp ToVulkanCompareOp(const CompareOp& op)
     {
         switch (op)
@@ -457,5 +540,15 @@ export namespace Aurion::Vulkan
             case CompareOp::Always: return vk::CompareOp::eAlways;
             default: return vk::CompareOp::eNever;
         }
+    }
+
+    constexpr std::array<f32, 4> ToDebugColor(const u32& rgba)
+    {
+        return {
+            static_cast<f32>((rgba >> 24) & 0xFF) / 255.0f,
+            static_cast<f32>((rgba >> 16) & 0xFF) / 255.0f,
+            static_cast<f32>((rgba >> 8) & 0xFF) / 255.0f,
+            static_cast<f32>(rgba & 0xFF) / 255.0f,
+        };
     }
 }

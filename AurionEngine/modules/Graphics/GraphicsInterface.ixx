@@ -1,5 +1,6 @@
 module;
 
+#include <memory>
 #include <vector>
 #include <span>
 #include <string_view>
@@ -93,10 +94,23 @@ export namespace Aurion
         virtual void EndQuery(const QueryPoolHandle& pool, const u32& query_index) = 0;
     };
 
+    struct IRenderContext
+    {
+        virtual ~IRenderContext() = default;
+
+        virtual void BeginFrame() = 0;
+        virtual void Draw(const RenderGraphCompilationResult& graph) = 0;
+        virtual void EndFrame() = 0;
+    };
+
     // Base driver interface for graphics-related operations
     struct IGraphicsDriver
     {
         virtual ~IGraphicsDriver() = default;
+
+        // --- Render Context ---
+
+        [[nodiscard]] virtual std::shared_ptr<IRenderContext> CreateRenderContext(const PresentMode& present_mode) = 0;
 
         // --- Single Resource Allocation ---
 
@@ -147,6 +161,8 @@ export namespace Aurion
 
         [[nodiscard]] virtual ResourceGroupLayoutHandle GetShaderResourceGroupLayout(const ShaderHandle& shader) = 0;
 
+        [[nodiscard]] virtual Extent GetRenderTargetExtent(const RenderTargetHandle& handle) = 0;
+
         // --- Buffer Operations ---
 
         // --- Texture Operations ---
@@ -158,7 +174,5 @@ export namespace Aurion
         // --- Pipeline Operations ---
 
         // --- Render Target Operations ---
-
-
     };
 }

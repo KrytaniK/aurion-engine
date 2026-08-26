@@ -22,19 +22,19 @@ export namespace Aurion::Vulkan
 {
     class API;
 
-    class Driver : public IGraphicsDriver
+    class Driver : public IGraphicsDriver, public std::enable_shared_from_this<Driver>
     {
     public:
         explicit Driver(const API* vulkan_api, const PhysicalDeviceProperties& pDevice_props, const DeviceProperties& device_props);
         ~Driver() override;
 
-        [[nodiscard]] SurfaceHandle CreateSurface(const SurfaceDescription& desc) override;
+        // --- Render Context ---
 
-
-        // ---------- OLD IMPLEMENTATION ----------
+        [[nodiscard]] std::shared_ptr<IRenderContext> CreateRenderContext(const PresentMode& present_mode) override;
 
         // --- Single Resource Allocation ---
 
+        [[nodiscard]] SurfaceHandle CreateSurface(const SurfaceDescription& desc) override;
         [[nodiscard]] PipelineHandle CreatePipeline(const PipelineDescription& desc) override;
         [[nodiscard]] ShaderHandle CreateShader(const ShaderDescription& desc) override;
         [[nodiscard]] BufferHandle CreateBuffer(const BufferDescription& desc) override;
@@ -80,15 +80,31 @@ export namespace Aurion::Vulkan
         // --- Resource Handle Retrieval ---
 
         [[nodiscard]] ResourceGroupLayoutHandle GetShaderResourceGroupLayout(const ShaderHandle& shader) override;
+        [[nodiscard]] Extent GetRenderTargetExtent(const RenderTargetHandle& handle) override;
+
+        [[nodiscard]] const BufferData& GetBufferData(const BufferHandle& handle) const;
+        [[nodiscard]] const TextureData& GetTextureData(const TextureHandle& handle) const;
+        [[nodiscard]] const TextureViewData& GetTextureViewData(const TextureViewHandle& handle) const;
+        [[nodiscard]] const SamplerData& GetSamplerData(const SamplerHandle& handle) const;
+        [[nodiscard]] const RenderTargetData& GetRenderTargetData(const RenderTargetHandle& handle) const;
+        [[nodiscard]] const ResourceMemoryData& GetResourceMemoryData(const ResourceMemoryHandle& handle) const;
+        [[nodiscard]] const ShaderData& GetShaderData(const ShaderHandle& handle) const;
+        [[nodiscard]] const PipelineData& GetPipelineData(const PipelineHandle& handle) const;
+        [[nodiscard]] const SurfaceData& GetSurfaceData(const SurfaceHandle& handle) const;
+        [[nodiscard]] const SwapchainData& GetSwapchainData(const SwapchainHandle& handle) const;
+        [[nodiscard]] const ResourcePoolData& GetResourcePoolData(const ResourcePoolHandle& handle) const;
+        [[nodiscard]] const ResourceGroupLayoutData& GetResourceGroupLayoutData(const ResourceGroupLayoutHandle& handle) const;
+        [[nodiscard]] const ResourceGroupData& GetResourceGroupData(const ResourceGroupHandle& handle) const;
+
+        [[nodiscard]] const vk::Image& ResolveImage(const TextureHandle& handle) const;
 
     private:
+
+        [[nodiscard]] u64 ValidateHandleIndex(const GPUHandle& handle, const u64& container_size) const;
 
         [[nodiscard]] SwapchainHandle CreateSwapchain(const SurfaceHandle& surface, const TextureDescription& image_desc, const TextureViewDescription& view_desc);
 
         // ---------- OLD IMPLEMENTATION ----------
-
-
-        [[nodiscard]] ResourceGroupLayoutHandle RegisterResourceGroupLayout(vk::raii::DescriptorSetLayout layout, const ResourceGroupLayoutDescription& desc);
 
         [[nodiscard]] vk::raii::ShaderModule CompileShaderModule(
             const std::string& path,

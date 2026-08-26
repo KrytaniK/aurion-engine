@@ -20,7 +20,6 @@ export namespace Aurion::Vulkan
     {
         u32 family_index = 0;
         vk::raii::Queue handle = nullptr;
-        std::span<vk::raii::CommandBuffer> command_buffers{};
     };
 
     struct BufferData
@@ -77,6 +76,7 @@ export namespace Aurion::Vulkan
     {
         SurfaceHandle surface{};
         vk::raii::SwapchainKHR swapchain = nullptr;
+        Extent extent{};
         std::vector<vk::Image> images{};
         std::vector<vk::raii::ImageView> views{};
         std::vector<vk::raii::Semaphore> acquire_semaphores{};
@@ -113,5 +113,12 @@ export namespace Aurion::Vulkan
     {
         std::shared_ptr<vk::raii::DeviceMemory> memory{};
         u64 size = 0;
+    };
+
+    struct CommandBufferGroup
+    {
+        std::pair<const QueueData*, std::span<vk::raii::CommandBuffer>> graphics{};
+        std::pair<const QueueData*, std::span<vk::raii::CommandBuffer>> compute{};
+        std::pair<const QueueData*, std::span<vk::raii::CommandBuffer>> transfer{};
     };
 }

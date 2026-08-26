@@ -2,6 +2,7 @@ module;
 
 #include <string>
 #include <vector>
+#include <span>
 #include <functional>
 #include <cstdint>
 
@@ -809,6 +810,9 @@ export namespace Aurion
         VirtualHandle handle{};
     };
 
+    struct ICommandList;
+    typedef std::function<void(ICommandList&, const FrameContext&)> RenderPassExecFn;
+
     struct ResourceMemoryRequirements
     {
         u64 size = 0;
@@ -817,9 +821,6 @@ export namespace Aurion
         bool prefers_dedicated_memory = false;
         bool requires_dedicated_memory = false;
     };
-
-    struct ICommandList;
-    typedef std::function<void(ICommandList&, const FrameContext&)> RenderPassExecFn;
 
     constexpr GPUResourceType GPUHandleType(const GPUHandle& handle)
     {

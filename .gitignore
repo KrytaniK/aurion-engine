@@ -7,6 +7,10 @@
 [Bb]in/
 [Bb]in-int/
 
+# Aurion-Engine Test Files/Assets
+AurionEngine/tests/
+Assets/
+
 # Solution files
 *.sln
 

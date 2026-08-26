@@ -13,7 +13,7 @@ module;
 #include <fcntl.h>
 #endif
 
-#include <bit>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 #include <unordered_map>
@@ -21,6 +21,8 @@ module;
 #include <algorithm>
 #include <string>
 #include <limits>
+#include <cassert>
+#include <span>
 
 module Aurion.Vulkan;
 
@@ -116,8 +118,6 @@ namespace Aurion::Vulkan
             // After flattening, generate DeviceQueueCreateInfo structures
             for (const auto& [index, desc] : qf_descs_flattened)
             {
-                AURION_WARN("Queue Family Index [%d]: Creating %d queues.", index, desc.count);
-
                 vk::DeviceQueueCreateInfo cInfo{};
                 cInfo.queueFamilyIndex = static_cast<u32>(index);
                 cInfo.queueCount = static_cast<u32>(desc.count);
@@ -169,6 +169,75 @@ namespace Aurion::Vulkan
         m_logical_device.waitIdle();
     }
 
+    std::shared_ptr<IRenderContext> Driver::CreateRenderContext(const PresentMode& present_mode)
+    {
+        // Determine buffer count based on desired present mode
+        u32 buffer_count = 1;
+        switch (present_mode)
+        {
+            case PresentMode::Immediate: { buffer_count = 1; break; };
+            case PresentMode::DoubleBufferedVSync: { buffer_count = 2; break; };
+            case PresentMode::TripleBufferedVSync: { buffer_count = 3; break; };
+            case PresentMode::QuadBufferedVSync: { buffer_count = 4; break; };
+            case PresentMode::DoubleBufferedLowLatency: { buffer_count = 2; break; };
+            case PresentMode::TripleBufferedLowLatency: { buffer_count = 3; break; };
+            case PresentMode::QuadBufferedLowLatency: { buffer_count = 4; break; };
+            default:  { buffer_count = 1; break; };
+        }
+
+        u32 graphics_qf_idx = UINT32_MAX;
+        u32 compute_qf_idx = UINT32_MAX;
+        u32 transfer_qf_idx = UINT32_MAX;
+
+        // Figure out which queue families support which operations.
+        for (auto& [qf_idx, qf] : m_queue_families)
+        {
+            // Graphics Queue Family
+            if (static_cast<bool>(qf.queueFlags & vk::QueueFlagBits::eGraphics) && graphics_qf_idx == UINT32_MAX)
+                graphics_qf_idx = qf_idx;
+
+            // Compute Queue Family
+            if (static_cast<bool>(qf.queueFlags & vk::QueueFlagBits::eCompute) && compute_qf_idx == UINT32_MAX)
+                compute_qf_idx = qf_idx;
+
+            // Transfer Queue Family
+            if (static_cast<bool>(qf.queueFlags & vk::QueueFlagBits::eTransfer) && transfer_qf_idx == UINT32_MAX)
+                transfer_qf_idx = qf_idx;
+        }
+
+        if (graphics_qf_idx == UINT32_MAX)
+            throw std::runtime_error("[VulkanDriver::CreateRenderContext] No queue family supports graphics operations.");
+
+        // Allocate one batch of command buffers (and resolve one queue) per unique queue family -
+        //  roles backed by the same family end up sharing both.
+        std::unordered_map<u32, std::span<vk::raii::CommandBuffer>> family_buffers{};
+        std::unordered_map<u32, const QueueData*> family_queues{};
+
+        // Allocate command buffers for each unique queue family, and get the associated queue
+        auto resolve_family = [&](const u32& qf_idx)
+        {
+            // If the queue family already has command buffers allocated, re-use them
+            if (qf_idx == UINT32_MAX || family_buffers.contains(qf_idx))
+                return;
+
+            QueueFamily& qf = m_queue_families[qf_idx];
+            family_buffers[qf_idx] = qf.AllocateCommandBuffers(m_logical_device, vk::CommandBufferLevel::ePrimary, buffer_count);
+            family_queues[qf_idx] = &qf.GetQueue(m_logical_device, 0);
+        };
+
+        resolve_family(graphics_qf_idx);
+        resolve_family(compute_qf_idx);
+        resolve_family(transfer_qf_idx);
+
+        CommandBufferGroup buffers = {
+            .graphics = { family_queues[graphics_qf_idx], family_buffers[graphics_qf_idx] },
+            .compute = { family_queues[compute_qf_idx], family_buffers[compute_qf_idx] },
+            .transfer = { family_queues[transfer_qf_idx], family_buffers[transfer_qf_idx] },
+        };
+
+        return std::make_shared<RenderContext>(this, m_logical_device, buffers, buffer_count);
+    }
+
     // --- Single Resource Allocation ---
 
     SurfaceHandle Driver::CreateSurface(const SurfaceDescription& desc)
@@ -205,7 +274,7 @@ namespace Aurion::Vulkan
             if (shader_handle.value == 0)
                 throw std::runtime_error("[VulkanDriver::CreatePipeline] Invalid shader handle.");
 
-            const ShaderData& shader_data = m_shaders[GPUHandleIndex(shader_handle)];
+            const ShaderData& shader_data = m_shaders[ValidateHandleIndex(shader_handle, m_shaders.size())];
 
             for (const auto& entry : shader_data.entry_points)
             {
@@ -222,7 +291,7 @@ namespace Aurion::Vulkan
             if (shader_data.group_layout.value == 0)
                 continue;
 
-            const ResourceGroupLayoutData& layout_data = m_resource_group_layouts[GPUHandleIndex(shader_data.group_layout)];
+            const ResourceGroupLayoutData& layout_data = m_resource_group_layouts[ValidateHandleIndex(shader_data.group_layout, m_resource_group_layouts.size())];
             set_layouts.push_back(*layout_data.layout);
         }
 
@@ -453,7 +522,7 @@ namespace Aurion::Vulkan
             return {};
         }
 
-        const TextureData& texture_data = m_textures[GPUHandleIndex(desc.texture)];
+        const TextureData& texture_data = m_textures[ValidateHandleIndex(desc.texture, m_textures.size())];
         TextureViewData& data = m_texture_views.emplace_back(nullptr, desc);
 
         vk::ImageViewCreateInfo info{};
@@ -665,8 +734,8 @@ namespace Aurion::Vulkan
             return {};
 
         std::vector<ResourceGroupHandle> out{};
-        ResourcePoolData& pool_data = m_resource_pools[GPUHandleIndex(pool)];
-        ResourceGroupLayoutData& layout_data = m_resource_group_layouts[GPUHandleIndex(layout)];
+        ResourcePoolData& pool_data = m_resource_pools[ValidateHandleIndex(pool, m_resource_pools.size())];
+        ResourceGroupLayoutData& layout_data = m_resource_group_layouts[ValidateHandleIndex(layout, m_resource_group_layouts.size())];
 
         std::vector<vk::DescriptorSetLayout> layouts(count, *layout_data.layout);
 
@@ -697,18 +766,18 @@ namespace Aurion::Vulkan
     {
         switch (GPUHandleType(handle))
         {
-            case GPUResourceType::Buffer: m_buffers.erase(m_buffers.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::Texture: m_textures.erase(m_textures.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::TextureView: m_texture_views.erase(m_texture_views.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::Sampler: m_samplers.erase(m_samplers.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::Shader: m_shaders.erase(m_shaders.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::Pipeline: m_pipelines.erase(m_pipelines.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::RenderTarget: m_render_targets.erase(m_render_targets.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::Surface: m_surfaces.erase(m_surfaces.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::ResourcePool: m_resource_pools.erase(m_resource_pools.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::ResourceGroupLayout: m_resource_group_layouts.erase(m_resource_group_layouts.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::ResourceGroup: m_resource_groups.erase(m_resource_groups.begin() + GPUHandleIndex(handle)); break;
-            case GPUResourceType::ResourceMemory: m_resource_memory.erase(m_resource_memory.begin() + GPUHandleIndex(handle)); break;
+            case GPUResourceType::Buffer: m_buffers.erase(m_buffers.begin() + ValidateHandleIndex(handle, m_buffers.size())); break;
+            case GPUResourceType::Texture: m_textures.erase(m_textures.begin() + ValidateHandleIndex(handle, m_textures.size())); break;
+            case GPUResourceType::TextureView: m_texture_views.erase(m_texture_views.begin() + ValidateHandleIndex(handle, m_texture_views.size())); break;
+            case GPUResourceType::Sampler: m_samplers.erase(m_samplers.begin() + ValidateHandleIndex(handle, m_samplers.size())); break;
+            case GPUResourceType::Shader: m_shaders.erase(m_shaders.begin() + ValidateHandleIndex(handle, m_shaders.size())); break;
+            case GPUResourceType::Pipeline: m_pipelines.erase(m_pipelines.begin() + ValidateHandleIndex(handle, m_pipelines.size())); break;
+            case GPUResourceType::RenderTarget: m_render_targets.erase(m_render_targets.begin() + ValidateHandleIndex(handle, m_render_targets.size())); break;
+            case GPUResourceType::Surface: m_surfaces.erase(m_surfaces.begin() + ValidateHandleIndex(handle, m_surfaces.size())); break;
+            case GPUResourceType::ResourcePool: m_resource_pools.erase(m_resource_pools.begin() + ValidateHandleIndex(handle, m_resource_pools.size())); break;
+            case GPUResourceType::ResourceGroupLayout: m_resource_group_layouts.erase(m_resource_group_layouts.begin() + ValidateHandleIndex(handle, m_resource_group_layouts.size())); break;
+            case GPUResourceType::ResourceGroup: m_resource_groups.erase(m_resource_groups.begin() + ValidateHandleIndex(handle, m_resource_groups.size())); break;
+            case GPUResourceType::ResourceMemory: m_resource_memory.erase(m_resource_memory.begin() + ValidateHandleIndex(handle, m_resource_memory.size())); break;
             default: break;
         }
 
@@ -733,11 +802,11 @@ namespace Aurion::Vulkan
             if (update.type != GPUResourceType::Unknown || update.group.value == 0)
                 return update.type;
 
-            const ResourceGroupData& group = m_resource_groups[GPUHandleIndex(update.group)];
+            const ResourceGroupData& group = m_resource_groups[ValidateHandleIndex(update.group, m_resource_groups.size())];
 
             if (group.layout.value == 0) return update.type;
 
-            const ResourceGroupLayoutData& layout = m_resource_group_layouts[GPUHandleIndex(group.layout)];
+            const ResourceGroupLayoutData& layout = m_resource_group_layouts[ValidateHandleIndex(group.layout, m_resource_group_layouts.size())];
 
             const auto it = std::ranges::find_if(layout.desc.bindings, [&](const auto& b) { return b.binding == update.binding; });
             return it != layout.desc.bindings.end() ? it->type : update.type;
@@ -765,7 +834,7 @@ namespace Aurion::Vulkan
         {
             if (update.group.value == 0 || update.resources.empty()) continue;
 
-            const ResourceGroupData& group = m_resource_groups[GPUHandleIndex(update.group)];
+            const ResourceGroupData& group = m_resource_groups[ValidateHandleIndex(update.group, m_resource_groups.size())];
             const GPUResourceType resolved_type = resolve_type(update);
 
             vk::WriteDescriptorSet write{};
@@ -784,7 +853,7 @@ namespace Aurion::Vulkan
                     vk::DescriptorBufferInfo info{};
                     if (res.value != 0)
                     {
-                        const BufferData& buffer_data = m_buffers[GPUHandleIndex(res)];
+                        const BufferData& buffer_data = m_buffers[ValidateHandleIndex(res, m_buffers.size())];
                         info.buffer = *buffer_data.buffer;
                         info.offset = 0;
                         info.range = buffer_data.desc.size;
@@ -803,12 +872,12 @@ namespace Aurion::Vulkan
 
                     if (GPUHandleType(res) == GPUResourceType::Sampler && res.value != 0)
                     {
-                        const SamplerData& sampler_data = m_samplers[GPUHandleIndex(res)];
+                        const SamplerData& sampler_data = m_samplers[ValidateHandleIndex(res, m_samplers.size())];
                         info.sampler = *sampler_data.sampler;
                     }
                     else if (res.value != 0)
                     {
-                        const TextureViewData& view_data = m_texture_views[GPUHandleIndex(res)];
+                        const TextureViewData& view_data = m_texture_views[ValidateHandleIndex(res, m_texture_views.size())];
                         info.imageView = *view_data.view;
                     }
 
@@ -901,27 +970,27 @@ namespace Aurion::Vulkan
     {
         if (resource.value == 0) return;
 
-        ResourceMemoryData& memory_data = m_resource_memory[GPUHandleIndex(memory)];
+        ResourceMemoryData& memory_data = m_resource_memory[ValidateHandleIndex(memory, m_resource_memory.size())];
 
         switch (GPUHandleType(resource))
         {
             case GPUResourceType::Buffer:
             {
-                BufferData& data = m_buffers[GPUHandleIndex(resource)];
+                BufferData& data = m_buffers[ValidateHandleIndex(resource, m_buffers.size())];
                 data.memory = memory_data.memory;
                 data.buffer.bindMemory(**memory_data.memory, offset);
                 break;
             }
             case GPUResourceType::Texture:
             {
-                TextureData& data = m_textures[GPUHandleIndex(resource)];
+                TextureData& data = m_textures[ValidateHandleIndex(resource, m_textures.size())];
                 data.memory = memory_data.memory;
                 data.image.bindMemory(**memory_data.memory, offset);
                 break;
             }
             case GPUResourceType::RenderTarget:
             {
-                RenderTargetData& data = m_render_targets[GPUHandleIndex(resource)];
+                RenderTargetData& data = m_render_targets[ValidateHandleIndex(resource, m_render_targets.size())];
 
                 // Don't attempt to bind to swapchain images, or invalid images
                 if (data.swapchain.value != 0 || data.image.value == 0) break;
@@ -939,11 +1008,116 @@ namespace Aurion::Vulkan
     ResourceGroupLayoutHandle Driver::GetShaderResourceGroupLayout(const ShaderHandle& shader)
     {
         if (shader.value == 0) return {};
-        return m_shaders[GPUHandleIndex(shader)].group_layout;
+        return m_shaders[ValidateHandleIndex(shader, m_shaders.size())].group_layout;
+    }
+
+    Extent Driver::GetRenderTargetExtent(const RenderTargetHandle& handle)
+    {
+        const RenderTargetData& data = m_render_targets[ValidateHandleIndex(handle, m_render_targets.size())];
+
+        // Swapchain-backed targets don't carry a meaningful extent on their own description -
+        //  the real extent is whatever was negotiated with the surface at swapchain creation time.
+        if (data.swapchain.value != 0)
+            return m_swapchains[ValidateHandleIndex(data.swapchain, m_swapchains.size())].extent;
+
+        return data.desc.image_desc.extent;
+    }
+
+    const BufferData& Driver::GetBufferData(const BufferHandle& handle) const
+    {
+        return m_buffers[ValidateHandleIndex(handle, m_buffers.size())];
+    }
+
+    const TextureData& Driver::GetTextureData(const TextureHandle& handle) const
+    {
+        return m_textures[ValidateHandleIndex(handle, m_textures.size())];
+    }
+
+    const TextureViewData& Driver::GetTextureViewData(const TextureViewHandle& handle) const
+    {
+        return m_texture_views[ValidateHandleIndex(handle, m_texture_views.size())];
+    }
+
+    const SamplerData& Driver::GetSamplerData(const SamplerHandle& handle) const
+    {
+        return m_samplers[ValidateHandleIndex(handle, m_samplers.size())];
+    }
+
+    const RenderTargetData& Driver::GetRenderTargetData(const RenderTargetHandle& handle) const
+    {
+        return m_render_targets[ValidateHandleIndex(handle, m_render_targets.size())];
+    }
+
+    const ResourceMemoryData& Driver::GetResourceMemoryData(const ResourceMemoryHandle& handle) const
+    {
+        return m_resource_memory[ValidateHandleIndex(handle, m_resource_memory.size())];
+    }
+
+    const ShaderData& Driver::GetShaderData(const ShaderHandle& handle) const
+    {
+        return m_shaders[ValidateHandleIndex(handle, m_shaders.size())];
+    }
+
+    const PipelineData& Driver::GetPipelineData(const PipelineHandle& handle) const
+    {
+        return m_pipelines[ValidateHandleIndex(handle, m_pipelines.size())];
+    }
+
+    const SurfaceData& Driver::GetSurfaceData(const SurfaceHandle& handle) const
+    {
+        return m_surfaces[ValidateHandleIndex(handle, m_surfaces.size())];
+    }
+
+    const SwapchainData& Driver::GetSwapchainData(const SwapchainHandle& handle) const
+    {
+        return m_swapchains[ValidateHandleIndex(handle, m_swapchains.size())];
+    }
+
+    const ResourcePoolData& Driver::GetResourcePoolData(const ResourcePoolHandle& handle) const
+    {
+        return m_resource_pools[ValidateHandleIndex(handle, m_resource_pools.size())];
+    }
+
+    const ResourceGroupLayoutData& Driver::GetResourceGroupLayoutData(const ResourceGroupLayoutHandle& handle) const
+    {
+        return m_resource_group_layouts[ValidateHandleIndex(handle, m_resource_group_layouts.size())];
+    }
+
+    const ResourceGroupData& Driver::GetResourceGroupData(const ResourceGroupHandle& handle) const
+    {
+        return m_resource_groups[ValidateHandleIndex(handle, m_resource_groups.size())];
+    }
+
+    const vk::Image& Driver::ResolveImage(const TextureHandle& handle) const
+    {
+        if (GPUHandleType(handle) != GPUResourceType::RenderTarget)
+            return *GetTextureData(handle).image;
+
+        const RenderTargetData& rt = GetRenderTargetData(static_cast<RenderTargetHandle>(handle));
+
+        if (rt.swapchain.value == 0)
+            return *GetTextureData(rt.image).image;
+
+        // NOTE: swapchain image-index acquisition isn't wired up yet - always targets the first image.
+        return GetSwapchainData(rt.swapchain).images[0];
+    }
+
+    u64 Driver::ValidateHandleIndex(const GPUHandle& handle, const u64& container_size) const
+    {
+        const u16 index = GPUHandleIndex(handle);
+
+        if (handle.value == 0)
+            AURION_ERROR("[VulkanDriver::ValidateHandleIndex] Invalid handle: handle.value is 0!");
+        else if (index >= container_size)
+            AURION_ERROR("[VulkanDriver::ValidateHandleIndex] Handle index (%u) is out of bounds (pool size: %zu)!", index, container_size);
+
+        assert((handle.value != 0 && index < container_size) && "ValidateHandleIndex: invalid or out-of-bounds resource handle");
+
+        return index;
     }
 
     SwapchainHandle Driver::CreateSwapchain(const SurfaceHandle& surface, const TextureDescription& image_desc,
-        const TextureViewDescription& view_desc)
+                                            const TextureViewDescription& view_desc)
     {
         if (surface.value == 0) // Can't create a swapchain from an invalid surface
         {
@@ -956,7 +1130,7 @@ namespace Aurion::Vulkan
         // TODO: Might be worthwhile to check surface generation here
 
         // Retrieve SurfaceData and WindowProperties
-        const SurfaceData& surface_data = m_surfaces[GPUHandleIndex(surface)];
+        const SurfaceData& surface_data = m_surfaces[ValidateHandleIndex(surface, m_surfaces.size())];
         const WindowProperties& win_props = surface_data.desc.window->GetProperties();
 
         // Query Surface capabilities
@@ -1024,6 +1198,8 @@ namespace Aurion::Vulkan
         sc_info.compositeAlpha = ToVulkanCompositeAlpha(surface_data.desc.composite_alpha);
         sc_info.presentMode = chosen_present_mode;
         sc_info.clipped = surface_data.desc.clipped;
+
+        data.extent = { chosen_extent.width, chosen_extent.height, 1 };
 
         data.swapchain = vk::raii::SwapchainKHR(m_logical_device, sc_info, nullptr);
 

@@ -33,7 +33,7 @@ export namespace Aurion
 
         void Export(const std::string_view& resource_name, const u64& generation, const ResourceUsageIntent& output_usage);
 
-        void Compile();
+        RenderGraphCompilationResult Compile();
 
         void Execute(ICommandList& cmd, const FrameContext& ctx) const;
 
@@ -54,7 +54,7 @@ export namespace Aurion
 
     private:
         std::shared_ptr<IGraphicsDriver> m_graphics_driver;
-        const RenderGraphResource* m_export_target;
+        RenderGraphResource* m_export_target;
         std::vector<VirtualHandle> m_resources;
         std::vector<BufferDescription> m_buffer_descriptions;
         std::vector<RenderTargetDescription> m_render_target_descriptions;

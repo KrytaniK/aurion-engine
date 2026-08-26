@@ -67,8 +67,7 @@ namespace Aurion
         //          that are required to be in a different state/layout than they were at the end of graph execution.
 
         // Make sure a pass has actually declared this resource as a written resource
-        bool found = false;
-        for (const auto& pass : m_passes)
+        for (auto& pass : m_passes)
         {
             auto it = std::ranges::find_if(pass.writes, [&](const auto& write){
                 return write.name == resource_name && write.generation == generation;
@@ -85,7 +84,7 @@ namespace Aurion
         AURION_ERROR("Failed to export target '%s', generation '%d': The specified resource/version combination is not a written resource of any known pass.", std::string(resource_name).c_str(), generation);
     }
 
-    void RenderGraph::Compile()
+    RenderGraphCompilationResult RenderGraph::Compile()
     {
         // Build a graph of pass dependencies
         auto dep_graph = BuildDependencyGraph();
@@ -104,6 +103,16 @@ namespace Aurion
 
         // Once resources have been created, resolve the handles for each pass
         ResolvePassResourceHandles();
+
+        // Then, if an export target was supplied, resolve its handle
+        m_export_target->handle = *std::ranges::find_if(m_resources, [&](const VirtualHandle& handle)
+            { return handle.name == m_export_target->name; });
+
+        return {
+            .passes = m_passes,
+            .execution_order = m_execution_order,
+            .export_target = m_export_target ? *m_export_target : RenderGraphResource{}
+        };
     }
 
     void RenderGraph::Execute(ICommandList& cmd, const FrameContext& ctx) const
@@ -156,15 +165,7 @@ namespace Aurion
 
             // Inject batched barriers before the pass executes
             cmd.PipelineBarrier(barrier_group);
-
-            if (m_export_target == nullptr)
-                pass.on_execute(cmd, ctx);
-            else
-            {
-                cmd.BeginRecording(static_cast<RenderTargetHandle>(m_export_target->handle));
-                pass.on_execute(cmd, ctx);
-                cmd.EndRecording();
-            }
+            pass.on_execute(cmd, ctx);
         }
 
         // After all passes execute, transition export target to final layout
@@ -535,7 +536,7 @@ namespace Aurion
         for (auto& pass : m_passes)
         {
             for (auto& read : pass.reads) process(read);
-            for (auto& write : pass.reads) process(write);
+            for (auto& write : pass.writes) process(write);
         }
     }
 }
