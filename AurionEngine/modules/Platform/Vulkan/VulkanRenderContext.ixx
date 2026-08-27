@@ -28,6 +28,9 @@ export namespace Aurion::Vulkan
         void Draw(const RenderGraphCompilationResult& graph) override;
         void EndFrame() override;
 
+        [[nodiscard]] const u32& GetFrameIndex() const override;
+        [[nodiscard]] const Extent& GetRenderExtent() const override;
+
     private:
         Driver* m_driver;
         const vk::raii::Device* m_logical_device;

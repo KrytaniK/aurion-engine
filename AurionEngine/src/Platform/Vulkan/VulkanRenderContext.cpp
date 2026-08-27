@@ -223,4 +223,14 @@ namespace Aurion::Vulkan
         // Increment frame index
         m_frame_context.frame_index = (m_frame_context.frame_index + 1) % m_graphics_buffers.size();
     }
+
+    const u32& RenderContext::GetFrameIndex() const
+    {
+        return m_frame_context.frame_index;
+    }
+
+    const Extent& RenderContext::GetRenderExtent() const
+    {
+        return m_frame_context.render_extent;
+    }
 }

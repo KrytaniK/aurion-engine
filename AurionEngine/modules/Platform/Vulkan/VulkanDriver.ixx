@@ -9,7 +9,6 @@ module;
 export module Aurion.Vulkan:Driver;
 
 import Aurion.Graphics;
-import Aurion.Assets;
 import Aurion.Types;
 import Aurion.Utility;
 
@@ -22,7 +21,7 @@ export namespace Aurion::Vulkan
 {
     class API;
 
-    class Driver : public IGraphicsDriver, public std::enable_shared_from_this<Driver>
+    class Driver : public IGraphicsDriver
     {
     public:
         explicit Driver(const API* vulkan_api, const PhysicalDeviceProperties& pDevice_props, const DeviceProperties& device_props);
@@ -100,13 +99,17 @@ export namespace Aurion::Vulkan
 
         [[nodiscard]] u32 AcquireNextImage(const RenderTargetHandle& handle, const u32& frame_index);
 
+        // --- Buffer Operations ---
+
+        void MapBuffer(const BufferHandle& handle, const u32& offset, const u32& size) override;
+        void WriteToBuffer(const BufferHandle& handle, void* data, const u32& offset, const u32& size) override;
+        void UnMapBuffer(const BufferHandle& handle) override;
+
     private:
 
         [[nodiscard]] u64 ValidateHandleIndex(const GPUHandle& handle, const u64& container_size) const;
 
         [[nodiscard]] SwapchainHandle CreateSwapchain(const SurfaceHandle& surface, const TextureDescription& image_desc, const TextureViewDescription& view_desc, SwapchainData* old_swapchain = nullptr);
-
-        // ---------- OLD IMPLEMENTATION ----------
 
         [[nodiscard]] vk::raii::ShaderModule CompileShaderModule(
             const std::string& path,

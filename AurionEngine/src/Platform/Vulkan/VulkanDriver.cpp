@@ -477,7 +477,7 @@ namespace Aurion::Vulkan
 
     BufferHandle Driver::CreateBuffer(const BufferDescription& desc)
     {
-        BufferData& data = m_buffers.emplace_back(nullptr, nullptr, desc);
+        BufferData& data = m_buffers.emplace_back(nullptr, nullptr, nullptr, desc);
 
         vk::BufferCreateInfo info{};
         info.size = desc.size;
@@ -1154,6 +1154,41 @@ namespace Aurion::Vulkan
         swap_data.image_index = index;
 
         return index;
+    }
+
+    void Driver::MapBuffer(const BufferHandle& handle, const u32& offset, const u32& size)
+    {
+        BufferData& buffer_data = m_buffers[ValidateHandleIndex(handle, m_buffers.size())];
+        const u32 map_size = size == UINT32_MAX ? buffer_data.desc.size : size;
+
+        buffer_data.mapped_memory = buffer_data.memory->mapMemory(offset, map_size);
+    }
+
+    void Driver::WriteToBuffer(const BufferHandle& handle, void* data, const u32& offset, const u32& size)
+    {
+        BufferData& buffer_data = m_buffers[ValidateHandleIndex(handle, m_buffers.size())];
+        const u32 map_size = size == UINT32_MAX ? buffer_data.desc.size : size;
+
+        // Mapping/Unmapping the buffers' memory should only occur here if it wasn't previously mapped.
+        const bool should_map = buffer_data.mapped_memory == nullptr;
+
+        if (should_map)
+            buffer_data.mapped_memory = buffer_data.memory->mapMemory(offset, map_size);
+
+        std::memcpy(buffer_data.mapped_memory, data, map_size);
+
+        if (should_map)
+        {
+            buffer_data.memory->unmapMemory();
+            buffer_data.mapped_memory = nullptr;
+        }
+    }
+
+    void Driver::UnMapBuffer(const BufferHandle& handle)
+    {
+        BufferData& buffer_data = m_buffers[ValidateHandleIndex(handle, m_buffers.size())];
+        buffer_data.memory->unmapMemory();
+        buffer_data.mapped_memory = nullptr;
     }
 
     u64 Driver::ValidateHandleIndex(const GPUHandle& handle, const u64& container_size) const

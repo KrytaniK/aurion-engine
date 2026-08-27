@@ -101,6 +101,9 @@ export namespace Aurion
         virtual void BeginFrame() = 0;
         virtual void Draw(const RenderGraphCompilationResult& graph) = 0;
         virtual void EndFrame() = 0;
+
+        [[nodiscard]] virtual const u32& GetFrameIndex() const = 0;
+        [[nodiscard]] virtual const Extent& GetRenderExtent() const = 0;
     };
 
     // Base driver interface for graphics-related operations
@@ -164,6 +167,10 @@ export namespace Aurion
         [[nodiscard]] virtual Extent GetRenderTargetExtent(const RenderTargetHandle& handle) = 0;
 
         // --- Buffer Operations ---
+
+        virtual void MapBuffer(const BufferHandle& handle, const u32& offset, const u32& size) = 0;
+        virtual void WriteToBuffer(const BufferHandle& handle, void* data, const u32& offset, const u32& size) = 0;
+        virtual void UnMapBuffer(const BufferHandle& handle) = 0;
 
         // --- Texture Operations ---
 

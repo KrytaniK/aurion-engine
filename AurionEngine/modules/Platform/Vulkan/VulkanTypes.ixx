@@ -26,6 +26,7 @@ export namespace Aurion::Vulkan
     {
         vk::raii::Buffer buffer = nullptr;
         std::shared_ptr<vk::raii::DeviceMemory> memory{}; // null until bound (transient path binds later)
+        void* mapped_memory = nullptr;
         BufferDescription desc{};
     };
 
