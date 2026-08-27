@@ -37,8 +37,7 @@ namespace Aurion::Vulkan
         if (rt_data.swapchain.value != 0)
         {
             const SwapchainData& sc_data = m_driver->GetSwapchainData(rt_data.swapchain);
-            // NOTE: swapchain image-index acquisition isn't wired up yet - always targets the first image.
-            view = *sc_data.views[0];
+            view = *sc_data.views[sc_data.image_index];
             extent = vk::Extent2D(sc_data.extent.width, sc_data.extent.height);
         }
         else

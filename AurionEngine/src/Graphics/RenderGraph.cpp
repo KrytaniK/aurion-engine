@@ -14,7 +14,7 @@ module Aurion.Graphics;
 namespace Aurion
 {
     RenderGraph::RenderGraph(const std::shared_ptr<IGraphicsDriver>& driver)
-        : m_graphics_driver(driver), m_export_target(nullptr), m_buffer_descriptions({}), m_render_target_descriptions({})
+        : m_graphics_driver(driver), m_export_target({}), m_buffer_descriptions({}), m_render_target_descriptions({})
     {
         m_buffer_descriptions.reserve(8);
         m_render_target_descriptions.reserve(8);
@@ -75,7 +75,8 @@ namespace Aurion
 
             if (it != pass.writes.end())
             {
-                m_export_target = &*it;
+                m_export_target = *it;
+                m_export_target.usage = output_usage;
                 return;
             }
         }
@@ -105,88 +106,19 @@ namespace Aurion
         ResolvePassResourceHandles();
 
         // Then, if an export target was supplied, resolve its handle
-        m_export_target->handle = *std::ranges::find_if(m_resources, [&](const VirtualHandle& handle)
-            { return handle.name == m_export_target->name; });
+        m_export_target.handle = *std::ranges::find_if(m_resources, [&](const VirtualHandle& handle)
+            { return handle.name == m_export_target.name; });
 
         return {
             .passes = m_passes,
             .execution_order = m_execution_order,
-            .export_target = m_export_target ? *m_export_target : RenderGraphResource{}
+            .export_target = m_export_target
         };
-    }
-
-    void RenderGraph::Execute(ICommandList& cmd, const FrameContext& ctx) const
-    {
-        std::unordered_map<u64, ResourceUsageIntent> resource_intents{};
-
-        for (const auto& pass_idx : m_execution_order) {
-            auto& pass = m_passes[pass_idx];
-
-            PipelineBarrierGroup barrier_group{};
-            std::vector<SubresourceTransition> subresource_transitions{};
-
-            auto process = [&](const RenderGraphResource& res) {
-                const auto& current_intent = resource_intents[res.handle.value];
-
-                if (current_intent == res.usage) return;
-
-                // If a state mismatch is found, a barrier must be injected
-                switch (GPUHandleType(res.handle))
-                {
-                case GPUResourceType::Buffer:
-                    {
-                        BufferBarrier barrier{};
-                        barrier.buffer = static_cast<BufferHandle>(res.handle);
-                        barrier.offset = 0;
-                        barrier.size = 0ull;
-                        barrier.src_access = AccessFromUsageIntent(current_intent);
-                        barrier.dst_access = AccessFromUsageIntent(res.usage);
-
-                        barrier_group.buffers.push_back(barrier);
-                    }
-                case GPUResourceType::RenderTarget:
-                    {
-                        ImageBarrier barrier{};
-                        barrier.image = static_cast<TextureHandle>(res.handle);
-                        barrier.src_layout = LayoutFromUsageIntent(current_intent);
-                        barrier.dst_layout = LayoutFromUsageIntent(res.usage);
-                        barrier.src_access = AccessFromUsageIntent(current_intent);
-                        barrier.dst_access = AccessFromUsageIntent(res.usage);
-                        barrier.subresource_range = {}; // TODO: This might matter
-
-                        barrier_group.images.push_back(barrier);
-                    }
-                default: {}
-                }
-            };
-
-            for (const auto& write : pass.writes) process(write);
-            for (const auto& read  : pass.reads)  process(read);
-
-            // Inject batched barriers before the pass executes
-            cmd.PipelineBarrier(barrier_group);
-            pass.on_execute(cmd, ctx);
-        }
-
-        // After all passes execute, transition export target to final layout
-        {
-            const auto& current_intent = resource_intents[m_export_target->handle.value];
-            ImageBarrier barrier{};
-            barrier.image = static_cast<TextureHandle>(m_export_target->handle);
-            barrier.src_access = AccessFromUsageIntent(current_intent);
-            barrier.dst_access = PipelineAccess::None;
-            barrier.src_layout = LayoutFromUsageIntent(current_intent);
-            barrier.dst_layout = LayoutFromUsageIntent(m_export_target->usage);
-
-            cmd.PipelineBarrier({
-                .images = { barrier }
-            });
-        }
     }
 
     const RenderGraphResource* RenderGraph::GetExportTarget() const
     {
-        return m_export_target;
+        return &m_export_target;
     }
 
     std::vector<std::vector<u64>> RenderGraph::BuildDependencyGraph() const
@@ -231,7 +163,7 @@ namespace Aurion
     std::vector<u64> RenderGraph::CullPasses(std::span<std::vector<u64>> graph) const
     {
         // If there's no export target, all passes are valid
-        if (m_export_target == nullptr)
+        if (m_export_target.name.empty())
             return std::vector<u64>(graph.size(), 1u);
 
         // Figure out which pass produces the exported render target
@@ -241,7 +173,7 @@ namespace Aurion
             const auto& writes = m_passes[final_pass_idx].writes;
 
             auto it = std::ranges::find_if(writes, [&](const auto& write){
-                return write.name == m_export_target->name && write.generation == m_export_target->generation;
+                return write.name == m_export_target.name && write.generation == m_export_target.generation;
             });
 
             if (it != writes.end())

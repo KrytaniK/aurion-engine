@@ -1098,8 +1098,62 @@ namespace Aurion::Vulkan
         if (rt.swapchain.value == 0)
             return *GetTextureData(rt.image).image;
 
-        // NOTE: swapchain image-index acquisition isn't wired up yet - always targets the first image.
-        return GetSwapchainData(rt.swapchain).images[0];
+        const SwapchainData& swap_data = GetSwapchainData(rt.swapchain);
+        return swap_data.images[swap_data.image_index];
+    }
+
+    u32 Driver::AcquireNextImage(const RenderTargetHandle& handle, const u32& frame_index)
+    {
+        RenderTargetData& data = m_render_targets[ValidateHandleIndex(handle, m_render_targets.size())];
+
+        if (data.swapchain.value == 0)
+            return frame_index;
+
+        SwapchainData& swap_data = m_swapchains[ValidateHandleIndex(data.swapchain, m_swapchains.size())];
+
+        const auto [result, index] = swap_data.swapchain.acquireNextImage(UINT64_MAX, *swap_data.acquire_semaphores[frame_index]);
+
+        // If the swapchain is out of date, recreate it
+        if (result == vk::Result::eErrorOutOfDateKHR)
+        {
+            // Clear out old swapchain data
+            swap_data.views.clear();
+            swap_data.images.clear();
+            swap_data.acquire_semaphores.clear();
+            swap_data.present_semaphores.clear();
+
+            // Update vulkan swapchain object
+            {
+                auto dummy_handle = CreateSwapchain(swap_data.surface, data.desc.image_desc, data.desc.view_desc, &swap_data);
+            }
+
+            return UINT32_MAX;
+        }
+
+        // If the swapchain is suboptimal, the surface likely needs to be recreated
+        if (result == vk::Result::eSuboptimalKHR)
+        {
+            // Clean up all swapchain data
+            swap_data.views.clear();
+            swap_data.images.clear();
+            swap_data.acquire_semaphores.clear();
+            swap_data.present_semaphores.clear();
+
+            // Regenerate surface
+            SurfaceData& surface_data = m_surfaces[ValidateHandleIndex(swap_data.surface, m_surfaces.size())];
+            surface_data.surface = CreateWindowSurface(surface_data.desc.window);
+
+            // Then regenerate swapchain
+            {
+                auto dummy_handle = CreateSwapchain(swap_data.surface, data.desc.image_desc, data.desc.view_desc, &swap_data);
+            }
+
+            return UINT32_MAX;
+        }
+
+        swap_data.image_index = index;
+
+        return index;
     }
 
     u64 Driver::ValidateHandleIndex(const GPUHandle& handle, const u64& container_size) const
@@ -1116,8 +1170,9 @@ namespace Aurion::Vulkan
         return index;
     }
 
-    SwapchainHandle Driver::CreateSwapchain(const SurfaceHandle& surface, const TextureDescription& image_desc,
-                                            const TextureViewDescription& view_desc)
+    SwapchainHandle Driver::CreateSwapchain(
+        const SurfaceHandle& surface, const TextureDescription& image_desc,
+        const TextureViewDescription& view_desc, SwapchainData* old_swapchain)
     {
         if (surface.value == 0) // Can't create a swapchain from an invalid surface
         {
@@ -1125,7 +1180,7 @@ namespace Aurion::Vulkan
             return {};
         }
 
-        SwapchainData& data = m_swapchains.emplace_back(surface);
+        SwapchainData& data = old_swapchain ? *old_swapchain : m_swapchains.emplace_back(surface);
 
         // TODO: Might be worthwhile to check surface generation here
 
@@ -1199,7 +1254,10 @@ namespace Aurion::Vulkan
         sc_info.presentMode = chosen_present_mode;
         sc_info.clipped = surface_data.desc.clipped;
 
-        data.extent = { chosen_extent.width, chosen_extent.height, 1 };
+        if (old_swapchain != nullptr)
+            sc_info.oldSwapchain = *data.swapchain;
+
+        data.extent = { .width = chosen_extent.width, .height = chosen_extent.height, .depth = 1 };
 
         data.swapchain = vk::raii::SwapchainKHR(m_logical_device, sc_info, nullptr);
 
@@ -1227,6 +1285,10 @@ namespace Aurion::Vulkan
             data.acquire_semaphores.emplace_back(m_logical_device, sem_info);
             data.present_semaphores.emplace_back(m_logical_device, sem_info);
         }
+
+        // If we're recreating a swapchain, there's no need to regenerate the handle
+        if (old_swapchain != nullptr)
+            return {};
 
         // Generate the handle
         SwapchainHandle handle{};

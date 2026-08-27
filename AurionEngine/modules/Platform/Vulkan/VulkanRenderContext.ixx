@@ -36,5 +36,6 @@ export namespace Aurion::Vulkan
         std::vector<CommandList> m_compute_buffers;
         std::vector<CommandList> m_transfer_buffers;
         FrameContext m_frame_context;
+        RenderGraphResource m_present_target;
     };
 }

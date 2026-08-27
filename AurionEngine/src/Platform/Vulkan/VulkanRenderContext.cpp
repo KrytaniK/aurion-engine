@@ -56,21 +56,36 @@ namespace Aurion::Vulkan
     void RenderContext::Draw(const RenderGraphCompilationResult& graph)
     {
         CommandList& graphics_cmd = m_graphics_buffers[m_frame_context.frame_index];
-        CommandList& compute_cmd = m_compute_buffers[m_frame_context.frame_index];
-        CommandList& transfer_cmd = m_transfer_buffers[m_frame_context.frame_index];
+        // CommandList& compute_cmd = m_compute_buffers[m_frame_context.frame_index];
+        // CommandList& transfer_cmd = m_transfer_buffers[m_frame_context.frame_index];
 
         graphics_cmd.Begin();
-        compute_cmd.Begin();
-        transfer_cmd.Begin();
+        // compute_cmd.Begin();
+        // transfer_cmd.Begin();
+
+        // Cache the graph's exported target as the presentable image
+        m_present_target = graph.export_target;
 
         // Set up frame context
-        //  If nothing was exported, keep last frame's extent rather than zeroing it out - passes
-        //  still execute in full (see RenderGraph::CullPasses) and may rely on a sane fallback.
-        if (GPUHandleType(graph.export_target.handle) == GPUResourceType::RenderTarget)
+        // Only update the render extent if the export target is a valid render target
+        if (GPUHandleType(m_present_target.handle) == GPUResourceType::RenderTarget)
         {
             RenderTargetHandle export_handle{};
-            export_handle.value = graph.export_target.handle.value;
-            m_frame_context.render_extent = m_driver->GetRenderTargetExtent(export_handle);
+            export_handle.value = m_present_target.handle.value;
+            const RenderTargetData& rt_data = m_driver->GetRenderTargetData(export_handle);
+
+            // Attempt to get the next image index. This will return the frame index for 'offline' images,
+            //  and the actual image index for vk::SwapchainKHR images.
+            const auto img_idx = m_driver->AcquireNextImage(export_handle, m_frame_context.frame_index);
+            if (img_idx == UINT32_MAX)
+                return;
+
+            if (rt_data.swapchain.value != 0)
+            {
+                const SwapchainData& swap_data = m_driver->GetSwapchainData(rt_data.swapchain);
+                m_frame_context.render_extent = swap_data.extent;
+            } else
+                m_frame_context.render_extent = rt_data.desc.image_desc.extent;
         }
 
         // Execute each pass, inserting resource transition barriers where appropriate
@@ -159,12 +174,52 @@ namespace Aurion::Vulkan
         }
 
         graphics_cmd.End();
-        compute_cmd.End();
-        transfer_cmd.End();
+        // compute_cmd.End();
+        // transfer_cmd.End();
     }
 
     void RenderContext::EndFrame()
     {
+        CommandList& graphics_cmd = m_graphics_buffers[m_frame_context.frame_index];
+        // CommandList& compute_cmd = m_compute_buffers[m_frame_context.frame_index];
+        // CommandList& transfer_cmd = m_transfer_buffers[m_frame_context.frame_index];
+
+        // If we're not presenting a render target, simply submit commands and continue the frame loop
+        if (m_present_target.handle.value == 0 || m_present_target.usage != ResourceUsageIntent::Present)
+        {
+            graphics_cmd.Submit({}, {}, *m_fences[m_frame_context.frame_index]);
+            // compute_cmd.Submit({}, {}, nullptr);
+            // transfer_cmd.Submit({}, {}, nullptr);
+
+            // Increment frame index
+            m_frame_context.frame_index = (m_frame_context.frame_index + 1) % m_graphics_buffers.size();
+
+            return;
+        }
+
+        // Otherwise, we can assume that the present target is valid, and needs to be synced/presented
+
+        const RenderTargetHandle rt_handle = static_cast<RenderTargetHandle>(m_present_target.handle);
+        const RenderTargetData& rt_data = m_driver->GetRenderTargetData(rt_handle);
+        const SwapchainData& swap_data = m_driver->GetSwapchainData(rt_data.swapchain);
+
+        vk::SemaphoreSubmitInfo wait_info{};
+        wait_info.semaphore = *swap_data.acquire_semaphores[m_frame_context.frame_index];
+        wait_info.stageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+
+        vk::SemaphoreSubmitInfo signal_info{};
+        signal_info.semaphore = *swap_data.present_semaphores[swap_data.image_index];
+        signal_info.stageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+
+        std::vector<vk::SemaphoreSubmitInfo> sem_waits{ wait_info };
+        std::vector<vk::SemaphoreSubmitInfo> sem_signals{ signal_info };
+        graphics_cmd.Submit(sem_waits, sem_signals, *m_fences[m_frame_context.frame_index]);
+        // compute_cmd.Submit({}, {}, nullptr);
+        // transfer_cmd.Submit({}, {}, nullptr);
+
+        std::vector<vk::Semaphore> present_sem_waits{ *swap_data.present_semaphores[swap_data.image_index] };
+        auto present_result = graphics_cmd.Present(rt_handle, swap_data.image_index, present_sem_waits);
+
         // Increment frame index
         m_frame_context.frame_index = (m_frame_context.frame_index + 1) % m_graphics_buffers.size();
     }

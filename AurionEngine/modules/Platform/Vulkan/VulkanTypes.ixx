@@ -81,6 +81,7 @@ export namespace Aurion::Vulkan
         std::vector<vk::raii::ImageView> views{};
         std::vector<vk::raii::Semaphore> acquire_semaphores{};
         std::vector<vk::raii::Semaphore> present_semaphores{};
+        u32 image_index = 0;
     };
 
     struct RenderTargetData

@@ -98,11 +98,13 @@ export namespace Aurion::Vulkan
 
         [[nodiscard]] const vk::Image& ResolveImage(const TextureHandle& handle) const;
 
+        [[nodiscard]] u32 AcquireNextImage(const RenderTargetHandle& handle, const u32& frame_index);
+
     private:
 
         [[nodiscard]] u64 ValidateHandleIndex(const GPUHandle& handle, const u64& container_size) const;
 
-        [[nodiscard]] SwapchainHandle CreateSwapchain(const SurfaceHandle& surface, const TextureDescription& image_desc, const TextureViewDescription& view_desc);
+        [[nodiscard]] SwapchainHandle CreateSwapchain(const SurfaceHandle& surface, const TextureDescription& image_desc, const TextureViewDescription& view_desc, SwapchainData* old_swapchain = nullptr);
 
         // ---------- OLD IMPLEMENTATION ----------
 
